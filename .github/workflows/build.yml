@@ -155,36 +155,37 @@ jobs:
           path: dist/*
           retention-days: 30
 
-  test:
-    name: Test Build
-    runs-on: windows-latest
-    needs: build
-    
-    steps:
-      - name: Download Windows artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: MediaGallery.exe
+test:
+  name: Test Build
+  runs-on: windows-latest
+  needs: build
+  strategy:
+    matrix:
+      artifact: [MediaGallery.exe, MediaGallery-arm64.exe]
+  
+  steps:
+    - name: Download artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: ${{ matrix.artifact }}
 
-      - name: Create test media files
-        run: |
-          mkdir test-media
-          cd test-media
-          
-          # Create dummy image files
-          echo "Test image 1" > image1.jpg
-          echo "Test image 2" > image2.png
-          
-          # Create subfolder
-          mkdir subfolder
-          echo "Test image 3" > subfolder/image3.jpg
+    - name: Create test media files
+      run: |
+        mkdir test-media
+        cd test-media
+        
+        # Create dummy files with proper extensions
+        fsutil file createnew image1.jpg 1024
+        fsutil file createnew image2.png 1024
+        
+        mkdir subfolder
+        fsutil file createnew subfolder/image3.jpg 1024
 
-      - name: Test executable (dry run)
-        run: |
-          cd test-media
-          # Run with timeout to test startup
-          timeout /t 10 ..\MediaGallery.exe || echo "Test completed"
-
+    - name: Test executable
+      run: |
+        cd test-media
+        # Test with timeout
+        timeout /t 5 ..\${{ matrix.artifact }} || echo "Test completed (expected exit)"
   release:
     name: Create Release
     runs-on: ubuntu-latest
