@@ -1,20 +1,18 @@
 #include <windows.h>
 
-// Embed the server binary - use correct path
-1 RCDATA "../server/server.exe"
+#define SERVER_EXE_RESOURCE 100
 
-// Icon (optional)
-// IDI_ICON1 ICON "icon.ico"
+SERVER_EXE_RESOURCE RCDATA "../server/server.exe"
 
-// Version information
+// Version info
 VS_VERSION_INFO VERSIONINFO
-FILEVERSION     1,0,0,0
-PRODUCTVERSION  1,0,0,0
-FILEFLAGSMASK   0x3fL
-FILEFLAGS       0x0L
-FILEOS          VOS_NT_WINDOWS32
-FILETYPE        VFT_APP
-FILESUBTYPE     0x0L
+ FILEVERSION     1,0,0,0
+ PRODUCTVERSION  1,0,0,0
+ FILEFLAGSMASK   0x3fL
+ FILEFLAGS       0x0L
+ FILEOS          VOS_NT_WINDOWS32
+ FILETYPE        VFT_APP
+ FILESUBTYPE     0x0L
 BEGIN
     BLOCK "StringFileInfo"
     BEGIN
