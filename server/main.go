@@ -46,27 +46,22 @@ func main() {
 		log.Fatal(err)
 	}
 
-// Read port from command line arguments passed by the launcher
-	port := "8987" // Default TLS port
+	// Read arguments: [0]=program, [1]=mediaDir, [2]=port, [3]=nobrowser flag
+	port := "8987"
+	noBrowser := false
+	
 	if len(os.Args) > 1 {
-		// os.Args[0] is program name, os.Args[1] is mediaDir (passed by launcher), os.Args[2] is port
-		if len(os.Args) > 2 {
-			port = os.Args[2]
-		}
-		// The launcher passes mediaDir as the first argument, which is usually the CWD but let's be explicit.
-		// In the launcher, we passed: "\"%s\" \"%s\" %s\"", serverPath, currentDir, port
-		// So: os.Args[0]=server.exe, os.Args[1]=currentDir, os.Args[2]=port
 		mediaDir = os.Args[1]
+	}
+	if len(os.Args) > 2 {
+		port = os.Args[2]
+	}
+	if len(os.Args) > 3 && os.Args[3] == "nobrowser" {
+		noBrowser = true
+		log.Println("Browser auto-launch disabled (nobrowser flag)")
 	}
 
 	log.Printf("Serving media from: %s", mediaDir)
-
-
-// REMOVED - no longer using filelist.json
-/* 	// Generate filelist.json
-	if err := generateFileList(mediaDir); err != nil {
-		log.Printf("Warning: Could not generate filelist: %v", err)
-	} */
 
 	// Setup routes
 	setupRoutes(mediaDir)
@@ -81,11 +76,14 @@ func main() {
 	log.Printf("🚀 Gallery ready at: %s", url)
 	log.Printf("Press Ctrl+C to stop")
 
-	// Auto-open browser after a delay
-	go func() {
-		time.Sleep(1500 * time.Millisecond)
-		openBrowser(url)
-	}()
+	// FIXED: Only auto-open browser if NOT launched by launcher
+	if !noBrowser {
+		log.Println("Auto-opening browser...")
+		go func() {
+			time.Sleep(1500 * time.Millisecond)
+			openBrowser(url)
+		}()
+	}
 
 	// Start HTTPS server
 	server := &http.Server{
@@ -135,46 +133,6 @@ func setupRoutes(mediaDir string) {
 	})
 }
 
-func generateFileList(dir string) error {
-    extensions := map[string]bool{
-        ".jpg": false, ".jpeg": false, ".png": false, ".webp": false,
-        ".gif": false, ".mp4": true, ".webm": true, ".ogg": true,
-        ".bmp": false, ".svg": false, ".mov": true, ".avi": true,
-    }
-
-    var files []string
-    err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-        if err != nil || info.IsDir() || strings.HasPrefix(info.Name(), ".") {
-            return nil
-        }
-
-        ext := strings.ToLower(filepath.Ext(path))
-        if _, exists := extensions[ext]; exists {
-            relPath, err := filepath.Rel(dir, path)
-            if err != nil {
-                return err
-            }
-            // Use forward slashes for web compatibility
-            files = append(files, filepath.ToSlash(relPath))
-        }
-        return nil
-    })
-
-    if err != nil {
-        return err
-    }
-
-    log.Printf("Found %d media files", len(files))
-
-    data, err := json.MarshalIndent(files, "", "  ")
-    if err != nil {
-        return err
-    }
-
-    return os.WriteFile(filepath.Join(dir, "filelist.json"), data, 0644)
-}
-
-
 func getDetailedFileList(dir string) ([]FileInfo, error) {
 	extensions := map[string]bool{
 		".jpg": false, ".jpeg": false, ".png": false, ".webp": false,
@@ -206,60 +164,61 @@ func getDetailedFileList(dir string) ([]FileInfo, error) {
 }
 
 func generateOrLoadCertificate() (tls.Certificate, error) {
-    certFile := filepath.Join(os.TempDir(), "mediagallery_cert.pem")
-    keyFile := filepath.Join(os.TempDir(), "mediagallery_key.pem")
+	certFile := filepath.Join(os.TempDir(), "mediagallery_cert.pem")
+	keyFile := filepath.Join(os.TempDir(), "mediagallery_key.pem")
 
-    // Try to load existing certificate
-    if _, err := os.Stat(certFile); err == nil {
-        if _, err := os.Stat(keyFile); err == nil {
-            cert, err := tls.LoadX509KeyPair(certFile, keyFile)
-            if err == nil {
-                log.Println("Loaded existing certificate")
-                return cert, nil
-            }
-        }
-    }
+	// Try to load existing certificate
+	if _, err := os.Stat(certFile); err == nil {
+		if _, err := os.Stat(keyFile); err == nil {
+			cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+			if err == nil {
+				log.Println("✅ Loaded existing certificate")
+				return cert, nil
+			}
+		}
+	}
 
-    // Generate new certificate
-    log.Println("Generating new certificate...")
-    priv, err := rsa.GenerateKey(rand.Reader, 2048)
-    if err != nil {
-        return tls.Certificate{}, err
-    }
+	// Generate new certificate
+	log.Println("Generating new certificate (first run)...")
+	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return tls.Certificate{}, err
+	}
 
-    serialNumber, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
-    if err != nil {
-        return tls.Certificate{}, err
-    }
+	serialNumber, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
+	if err != nil {
+		return tls.Certificate{}, err
+	}
 
-    template := x509.Certificate{
-        SerialNumber: serialNumber,
-        Subject: pkix.Name{
-            Organization: []string{"Media Gallery Local Server"},
-            CommonName:   "localhost",
-        },
-        NotBefore:             time.Now(),
-        NotAfter:              time.Now().Add(3650 * 24 * time.Hour), // 10 years
-        KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-        ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-        BasicConstraintsValid: true,
-        DNSNames:              []string{"localhost"},
-        IPAddresses:           []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("::1")},
-    }
+	template := x509.Certificate{
+		SerialNumber: serialNumber,
+		Subject: pkix.Name{
+			Organization: []string{"Media Gallery Local Server"},
+			CommonName:   "localhost",
+		},
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(3650 * 24 * time.Hour), // 10 years
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+		DNSNames:              []string{"localhost"},
+		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("::1")},
+	}
 
-    certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
-    if err != nil {
-        return tls.Certificate{}, err
-    }
+	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
+	if err != nil {
+		return tls.Certificate{}, err
+	}
 
-    certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
-    keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)})
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)})
 
-    // Save certificate to disk
-    os.WriteFile(certFile, certPEM, 0644)
-    os.WriteFile(keyFile, keyPEM, 0600)
+	// Save certificate to disk
+	os.WriteFile(certFile, certPEM, 0644)
+	os.WriteFile(keyFile, keyPEM, 0600)
 
-    return tls.X509KeyPair(certPEM, keyPEM)
+	log.Println("✅ Certificate saved for future use")
+	return tls.X509KeyPair(certPEM, keyPEM)
 }
 
 func corsMiddleware(next http.Handler) http.Handler {
