@@ -265,7 +265,7 @@
             <option value="all">All Files</option>
         </select>
         <label>
-            <input type="checkbox" id="shuffleToggle" checked> Shuffle
+            <input type="checkbox" id="shuffleToggle"> Shuffle
         </label>
         <button onclick="forceReshuffle()">🔀 Re-shuffle</button>
         <button onclick="resetViewed()">↺ Reset Viewed</button>
@@ -371,14 +371,13 @@
             const grid = document.querySelector('.grid');
             const shuffleEnabled = document.getElementById('shuffleToggle').checked;
             
-            grid.innerHTML = '';
-            
-            if (masonry) {
+             if (masonry) {
                 masonry.destroy();
                 masonry = null;
             }
             
             let filesToShow = FOLDER_MAP[folderName] || [];
+
             let displayList = [...filesToShow];
             
             if (shuffleEnabled) {
@@ -478,9 +477,11 @@
                 imagesLoaded(elements, () => masonry.layout());
             } else {
                 imagesLoaded(elements, () => {
-                    initializeMasonry();
+                    if(!masonry){
+			initializeMasonry();
                     setTimeout(() => masonry && masonry.layout(), 50);
-                });
+             		}
+		});
             }
         }
 

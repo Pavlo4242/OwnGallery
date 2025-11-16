@@ -46,6 +46,21 @@ func main() {
 		log.Fatal(err)
 	}
 
+// Read port from command line arguments passed by the launcher
+	port := "8443" // Default TLS port
+	if len(os.Args) > 1 {
+		// os.Args[0] is program name, os.Args[1] is mediaDir (passed by launcher), os.Args[2] is port
+		if len(os.Args) > 2 {
+			port = os.Args[2]
+		}
+		// The launcher passes mediaDir as the first argument, which is usually the CWD but let's be explicit.
+		// In the launcher, we passed: "\"%s\" \"%s\" %s\"", serverPath, currentDir, port
+		// So: os.Args[0]=server.exe, os.Args[1]=currentDir, os.Args[2]=port
+		mediaDir = os.Args[1]
+	}
+
+
+
 	log.Printf("Serving media from: %s", mediaDir)
 
 	// Generate filelist.json
@@ -62,7 +77,7 @@ func main() {
 		log.Fatalf("Failed to generate certificate: %v", err)
 	}
 
-	url := "https://localhost:8443"
+	url := "https://localhost:" + port
 	log.Printf("🚀 Gallery ready at: %s", url)
 	log.Printf("Press Ctrl+C to stop")
 
@@ -74,7 +89,7 @@ func main() {
 
 	// Start HTTPS server
 	server := &http.Server{
-		Addr:         ":8234",
+		Addr:         ":" + port,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
