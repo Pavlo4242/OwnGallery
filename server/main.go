@@ -121,48 +121,44 @@ func setupRoutes(mediaDir string) {
 }
 
 func generateFileList(dir string) error {
-	extensions := map[string]bool{
-		".jpg": true, ".jpeg": true, ".png": true, ".webp": true,
-		".gif": true, ".mp4": true, ".webm": true, ".ogg": true,
-		".bmp": true, ".svg": true, ".mov": true, ".avi": true,
-	}
+    extensions := map[string]bool{
+        ".jpg": false, ".jpeg": false, ".png": false, ".webp": false,
+        ".gif": false, ".mp4": true, ".webm": true, ".ogg": true,
+        ".bmp": false, ".svg": false, ".mov": true, ".avi": true,
+    }
 
-	var files []string
-	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
+    var files []string
+    err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+        if err != nil || info.IsDir() || strings.HasPrefix(info.Name(), ".") {
+            return nil
+        }
 
-		// Skip hidden files/folders and the executable itself
-		if info.IsDir() || strings.HasPrefix(info.Name(), ".") {
-			return nil
-		}
+        ext := strings.ToLower(filepath.Ext(path))
+        if _, exists := extensions[ext]; exists {
+            relPath, err := filepath.Rel(dir, path)
+            if err != nil {
+                return err
+            }
+            // Use forward slashes for web compatibility
+            files = append(files, filepath.ToSlash(relPath))
+        }
+        return nil
+    })
 
-		ext := strings.ToLower(filepath.Ext(path))
-		if extensions[ext] {
-			relPath, err := filepath.Rel(dir, path)
-			if err != nil {
-				return err
-			}
-			// Convert to forward slashes for web compatibility
-			files = append(files, filepath.ToSlash(relPath))
-		}
-		return nil
-	})
+    if err != nil {
+        return err
+    }
 
-	if err != nil {
-		return err
-	}
+    log.Printf("Found %d media files", len(files))
 
-	log.Printf("Found %d media files", len(files))
+    data, err := json.MarshalIndent(files, "", "  ")
+    if err != nil {
+        return err
+    }
 
-	data, err := json.MarshalIndent(files, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	return os.WriteFile(filepath.Join(dir, "filelist.json"), data, 0644)
+    return os.WriteFile(filepath.Join(dir, "filelist.json"), data, 0644)
 }
+
 
 func getDetailedFileList(dir string) ([]FileInfo, error) {
 	extensions := map[string]bool{
