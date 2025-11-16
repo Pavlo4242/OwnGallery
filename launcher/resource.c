@@ -1,10 +1,10 @@
 #include <windows.h>
 
-// Embed the server binary
+// Embed the server binary - use correct path
 1 RCDATA "../server/server.exe"
 
-// Icon (optional - add your own icon.ico)
-IDI_ICON1 ICON "icon.ico"
+// Icon (optional)
+// IDI_ICON1 ICON "icon.ico"
 
 // Version information
 VS_VERSION_INFO VERSIONINFO
