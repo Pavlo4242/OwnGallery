@@ -74,7 +74,7 @@ func main() {
 
 	// Start HTTPS server
 	server := &http.Server{
-		Addr:         ":8443",
+		Addr:         ":8234",
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
