@@ -3,26 +3,43 @@
 #include <stdlib.h>
 #include <shlwapi.h>
 #include <shellapi.h>
+#include <shlobj.h>
 #include <time.h>
 
 // Definitions
 #define MAX_RETRIES 3
-#define RETRY_DELAY 500 // 500ms
+#define RETRY_DELAY 500
 #define SERVER_EXE_RESOURCE 1
 #define BUFFER_SIZE 4096
 
-// --- New definitions for Tray Icon ---
+// Tray Icon definitions
 #define WM_TRAY_ICON (WM_USER + 1)
 #define ID_TRAY_EXIT 1001
+#define ID_TRAY_CHANGE_FOLDER 1002
+#define ID_TRAY_OPEN_BROWSER 1003
+#define IDI_TRAY_ICON 101
+
 const char CLASS_NAME[] = "MediaGalleryLauncherWindow";
 
-// --- Global Handles ---
+// Global Handles
 PROCESS_INFORMATION serverProcessInfo;
 HANDLE hServerProcess = NULL;
-char serverExePath[MAX_PATH]; // Store path for cleanup
-char tempExePath[MAX_PATH];   // Store path for cleanup
+char serverExePath[MAX_PATH];
+char tempExePath[MAX_PATH];
+char currentMediaDir[MAX_PATH];
+char currentPort[10] = "8987";
+HWND hMainWindow = NULL;
+NOTIFYICONDATA nid = {0};
 
-// (ExtractServerBinary, GetCurrentDir, LaunchBrowser remain unchanged)
+// Forward declarations
+void LaunchBrowser(const char* url);
+void TerminateServerProcess(HANDLE hProcess, DWORD processId);
+void CleanupWithRetries(const char* serverPath, const char* tempPath);
+BOOL ExtractServerBinary(char* outputPath);
+void GetCurrentDir(char* buffer, size_t size);
+BOOL StartServer(const char* mediaDir, const char* port);
+void UpdateTrayTooltip(const char* dir);
+
 BOOL ExtractServerBinary(char* outputPath) {
     HRSRC hResInfo = FindResource(NULL, MAKEINTRESOURCE(SERVER_EXE_RESOURCE), RT_RCDATA);
     if (!hResInfo) return FALSE;
@@ -82,8 +99,6 @@ void LaunchBrowser(const char* url) {
     CloseHandle(pi.hThread);
 }
 
-
-// (TerminateServerProcess and CleanupWithRetries remain unchanged)
 void TerminateServerProcess(HANDLE hProcess, DWORD processId) {
     if (hProcess && hProcess != INVALID_HANDLE_VALUE) {
         DWORD exitCode;
@@ -111,52 +126,140 @@ void CleanupWithRetries(const char* serverPath, const char* tempPath) {
     }
 }
 
-// --- NEW: Window Procedure to handle tray icon messages ---
+BOOL StartServer(const char* mediaDir, const char* port) {
+    // Terminate existing server if running
+    if (hServerProcess) {
+        TerminateServerProcess(hServerProcess, serverProcessInfo.dwProcessId);
+        CloseHandle(hServerProcess);
+        CloseHandle(serverProcessInfo.hThread);
+        hServerProcess = NULL;
+    }
+
+    // Launch new server (without opening browser)
+    STARTUPINFO si = {sizeof(si)};
+    PROCESS_INFORMATION pi;
+    si.dwFlags = STARTF_USESHOWWINDOW;
+    si.wShowWindow = SW_HIDE;
+    
+    char cmdLine[BUFFER_SIZE];
+    snprintf(cmdLine, sizeof(cmdLine), "\"%s\" \"%s\" %s nobrowser", 
+             serverExePath, mediaDir, port);
+    
+    if (!CreateProcess(NULL, cmdLine, NULL, NULL, FALSE, 
+                      CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) {
+        MessageBox(NULL, "Failed to start server", "Error", MB_ICONERROR);
+        return FALSE;
+    }
+    
+    serverProcessInfo = pi;
+    hServerProcess = pi.hProcess;
+    strcpy(currentMediaDir, mediaDir);
+    strcpy(currentPort, port);
+    
+    return TRUE;
+}
+
+void UpdateTrayTooltip(const char* dir) {
+    char tooltip[256];
+    char shortDir[64];
+    
+    // Get just the folder name
+    const char* lastSlash = strrchr(dir, '\\');
+    if (lastSlash) {
+        strncpy(shortDir, lastSlash + 1, sizeof(shortDir) - 1);
+    } else {
+        strncpy(shortDir, dir, sizeof(shortDir) - 1);
+    }
+    shortDir[sizeof(shortDir) - 1] = '\0';
+    
+    snprintf(tooltip, sizeof(tooltip), "Media Gallery - %s", shortDir);
+    strcpy(nid.szTip, tooltip);
+    Shell_NotifyIcon(NIM_MODIFY, &nid);
+}
+
+void ChangeFolderAndRestart() {
+    char newFolder[MAX_PATH] = {0};
+    
+    BROWSEINFO bi = {0};
+    bi.hwndOwner = hMainWindow;
+    bi.lpszTitle = "Select Media Folder";
+    bi.ulFlags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE;
+    
+    LPITEMIDLIST pidl = SHBrowseForFolder(&bi);
+    if (pidl) {
+        if (SHGetPathFromIDList(pidl, newFolder)) {
+            // Restart server with new folder
+            if (StartServer(newFolder, currentPort)) {
+                UpdateTrayTooltip(newFolder);
+                
+                // Open browser to new location
+                char url[BUFFER_SIZE];
+                snprintf(url, sizeof(url), "https://localhost:%s", currentPort);
+                LaunchBrowser(url);
+            }
+        }
+        CoTaskMemFree(pidl);
+    }
+}
+
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
         case WM_TRAY_ICON:
-            // Message from the tray icon
             if (lParam == WM_RBUTTONUP) {
-                // Show right-click menu
                 POINT curPoint;
                 GetCursorPos(&curPoint);
                 HMENU hMenu = CreatePopupMenu();
-                AppendMenu(hMenu, MF_STRING, ID_TRAY_EXIT, "Exit Media Gallery");
                 
-                SetForegroundWindow(hwnd); // Required for menu to work
+                AppendMenu(hMenu, MF_STRING, ID_TRAY_CHANGE_FOLDER, "Change Folder...");
+                AppendMenu(hMenu, MF_STRING, ID_TRAY_OPEN_BROWSER, "Open in Browser");
+                AppendMenu(hMenu, MF_SEPARATOR, 0, NULL);
+                AppendMenu(hMenu, MF_STRING, ID_TRAY_EXIT, "Exit");
+                
+                SetForegroundWindow(hwnd);
                 TrackPopupMenu(hMenu, TPM_RIGHTBUTTON, curPoint.x, curPoint.y, 0, hwnd, NULL);
-                PostMessage(hwnd, WM_NULL, 0, 0); // Required
+                PostMessage(hwnd, WM_NULL, 0, 0);
                 DestroyMenu(hMenu);
+            } else if (lParam == WM_LBUTTONDBLCLK) {
+                // Double-click opens browser
+                char url[BUFFER_SIZE];
+                snprintf(url, sizeof(url), "https://localhost:%s", currentPort);
+                LaunchBrowser(url);
             }
             break;
+            
         case WM_COMMAND:
-            // Menu item clicked
-            if (LOWORD(wParam) == ID_TRAY_EXIT) {
-                PostMessage(hwnd, WM_CLOSE, 0, 0); // Trigger window close
+            switch (LOWORD(wParam)) {
+                case ID_TRAY_CHANGE_FOLDER:
+                    ChangeFolderAndRestart();
+                    break;
+                case ID_TRAY_OPEN_BROWSER: {
+                    char url[BUFFER_SIZE];
+                    snprintf(url, sizeof(url), "https://localhost:%s", currentPort);
+                    LaunchBrowser(url);
+                    break;
+                }
+                case ID_TRAY_EXIT:
+                    PostMessage(hwnd, WM_CLOSE, 0, 0);
+                    break;
             }
             break;
+            
         case WM_CLOSE:
             DestroyWindow(hwnd);
             break;
-        case WM_DESTROY:
-            // 1. Remove tray icon
-            NOTIFYICONDATA nid = {sizeof(nid)};
-            nid.hWnd = hwnd;
-            Shell_NotifyIcon(NIM_DELETE, &nid);
-
-            // 2. Terminate the server process
-            TerminateServerProcess(hServerProcess, serverProcessInfo.dwProcessId);
             
-            // 3. Tell the message loop to exit
+        case WM_DESTROY:
+            Shell_NotifyIcon(NIM_DELETE, &nid);
+            TerminateServerProcess(hServerProcess, serverProcessInfo.dwProcessId);
             PostQuitMessage(0);
             break;
+            
         default:
             return DefWindowProc(hwnd, uMsg, wParam, lParam);
     }
     return 0;
 }
 
-// --- NEW: Function to create the invisible window ---
 HWND CreateHostWindow(HINSTANCE hInstance) {
     WNDCLASS wc = {0};
     wc.lpfnWndProc = WindowProc;
@@ -165,7 +268,6 @@ HWND CreateHostWindow(HINSTANCE hInstance) {
     
     RegisterClass(&wc);
     
-    // Create an invisible message-only window
     return CreateWindowEx(
         0, CLASS_NAME, "Media Gallery Host", 0,
         0, 0, 0, 0,
@@ -173,11 +275,10 @@ HWND CreateHostWindow(HINSTANCE hInstance) {
     );
 }
 
-
-// --- UPDATED: Main entry point ---
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
     char currentDir[MAX_PATH];
-    HWND hMainWnd;
+    
+    CoInitialize(NULL);
     
     // Get current directory
     GetCurrentDir(currentDir, sizeof(currentDir));
@@ -188,11 +289,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
              "MediaGallery_%d\\", GetCurrentProcessId());
     CreateDirectory(tempExePath, NULL);
 
-    // Get port
-    char port[10] = "8987"; // Your new default port
+    // Get port from command line if provided
     if (lpCmdLine && strlen(lpCmdLine) > 0) {
-       strncpy(port, lpCmdLine, sizeof(port) - 1);
-       port[sizeof(port) - 1] = '\0';
+       strncpy(currentPort, lpCmdLine, sizeof(currentPort) - 1);
+       currentPort[sizeof(currentPort) - 1] = '\0';
     }
     
     // Extract server binary
@@ -206,68 +306,47 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
          MessageBox(NULL, errMsg, "Extraction Error", MB_ICONERROR | MB_OK);
         return 1;
     }
-    if (!PathFileExists(serverExePath)) {
-         MessageBox(NULL, "Server binary extraction failed - file not found after extraction", 
-                    "Error", MB_ICONERROR);
-        return 1;
-    }
 
-    // --- NEW: Create the host window BEFORE launching server ---
-    hMainWnd = CreateHostWindow(hInstance);
-    if (hMainWnd == NULL) {
+    // Create the host window
+    hMainWindow = CreateHostWindow(hInstance);
+    if (hMainWindow == NULL) {
         MessageBox(NULL, "Failed to create host window", "Error", MB_ICONERROR);
         return 1;
     }
     
-    // Launch server
-    STARTUPINFO si = {sizeof(si)};
-    PROCESS_INFORMATION pi; // --- THIS LINE WAS MISSING ---
-    si.dwFlags = STARTF_USESHOWWINDOW;
-    si.wShowWindow = SW_HIDE;
-    
-    char cmdLine[BUFFER_SIZE];
-    snprintf(cmdLine, sizeof(cmdLine), "\"%s\" \"%s\" %s", serverExePath, currentDir, port); 
-    
-    if (!CreateProcess(NULL, cmdLine, NULL, NULL, FALSE, 
-                      CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) {
-        MessageBox(NULL, "Failed to start server", "Error", MB_ICONERROR);
-        DestroyWindow(hMainWnd); // Clean up window
+    // Start server (with nobrowser flag)
+    if (!StartServer(currentDir, currentPort)) {
+        DestroyWindow(hMainWindow);
         return 1;
     }
     
-    // Store process info globally
-    serverProcessInfo = pi;
-    hServerProcess = pi.hProcess;
-    
-    // Launch browser
+    // Launch browser ONLY from launcher
     char url[BUFFER_SIZE];
-    snprintf(url, sizeof(url), "https://localhost:%s", port);
+    snprintf(url, sizeof(url), "https://localhost:%s", currentPort);
     LaunchBrowser(url);
     
-    // --- FIXED: Create system tray icon ---
-    NOTIFYICONDATA nid = {sizeof(nid)};
-    nid.hWnd = hMainWnd; // Attach to our new invisible window
+    // Create system tray icon
+    nid.cbSize = sizeof(nid);
+    nid.hWnd = hMainWindow;
     nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
-    nid.uCallbackMessage = WM_TRAY_ICON; // Send messages to our WindowProc
-    nid.hIcon = LoadIcon(NULL, IDI_APPLICATION);
-    strcpy(nid.szTip, "Media Gallery Running (Right-click to Exit)");
+    nid.uCallbackMessage = WM_TRAY_ICON;
+    nid.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_TRAY_ICON)); // We'll add custom icon later
+    UpdateTrayTooltip(currentDir);
     Shell_NotifyIcon(NIM_ADD, &nid);
     
-    // --- NEW: Run the message loop ---
-    // This will run until PostQuitMessage(0) is called (by our tray menu)
+    // Run message loop
     MSG msg = {0};
     while (GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
     
-    // --- Cleanup (after message loop exits) ---
+    // Cleanup
     CloseHandle(hServerProcess);
     CloseHandle(serverProcessInfo.hThread);
-    
-    Sleep(1000); // Wait for file handles to be released
-    
+    Sleep(1000);
     CleanupWithRetries(serverExePath, tempExePath);
     
+    CoUninitialize();
     return 0;
 }

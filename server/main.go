@@ -72,7 +72,7 @@ func main() {
 	setupRoutes(mediaDir)
 
 	// Generate self-signed certificate
-	cert, err := generateCertificate()
+	cert, err := generateOrLoadCertificate()
 	if err != nil {
 		log.Fatalf("Failed to generate certificate: %v", err)
 	}
@@ -205,41 +205,61 @@ func getDetailedFileList(dir string) ([]FileInfo, error) {
 	return files, err
 }
 
-func generateCertificate() (tls.Certificate, error) {
-	priv, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		return tls.Certificate{}, err
-	}
+func generateOrLoadCertificate() (tls.Certificate, error) {
+    certFile := filepath.Join(os.TempDir(), "mediagallery_cert.pem")
+    keyFile := filepath.Join(os.TempDir(), "mediagallery_key.pem")
 
-	serialNumber, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
-	if err != nil {
-		return tls.Certificate{}, err
-	}
+    // Try to load existing certificate
+    if _, err := os.Stat(certFile); err == nil {
+        if _, err := os.Stat(keyFile); err == nil {
+            cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+            if err == nil {
+                log.Println("Loaded existing certificate")
+                return cert, nil
+            }
+        }
+    }
 
-	template := x509.Certificate{
-		SerialNumber: serialNumber,
-		Subject: pkix.Name{
-			Organization: []string{"Media Gallery Local Server"},
-			CommonName:   "localhost",
-		},
-		NotBefore:             time.Now(),
-		NotAfter:              time.Now().Add(365 * 24 * time.Hour),
-		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		BasicConstraintsValid: true,
-		DNSNames:              []string{"localhost"},
-		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("::1")}, 
-	}
+    // Generate new certificate
+    log.Println("Generating new certificate...")
+    priv, err := rsa.GenerateKey(rand.Reader, 2048)
+    if err != nil {
+        return tls.Certificate{}, err
+    }
 
-	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
-	if err != nil {
-		return tls.Certificate{}, err
-	}
+    serialNumber, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
+    if err != nil {
+        return tls.Certificate{}, err
+    }
 
-	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
-	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)})
+    template := x509.Certificate{
+        SerialNumber: serialNumber,
+        Subject: pkix.Name{
+            Organization: []string{"Media Gallery Local Server"},
+            CommonName:   "localhost",
+        },
+        NotBefore:             time.Now(),
+        NotAfter:              time.Now().Add(3650 * 24 * time.Hour), // 10 years
+        KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+        ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+        BasicConstraintsValid: true,
+        DNSNames:              []string{"localhost"},
+        IPAddresses:           []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("::1")},
+    }
 
-	return tls.X509KeyPair(certPEM, keyPEM)
+    certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
+    if err != nil {
+        return tls.Certificate{}, err
+    }
+
+    certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
+    keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)})
+
+    // Save certificate to disk
+    os.WriteFile(certFile, certPEM, 0644)
+    os.WriteFile(keyFile, keyPEM, 0600)
+
+    return tls.X509KeyPair(certPEM, keyPEM)
 }
 
 func corsMiddleware(next http.Handler) http.Handler {

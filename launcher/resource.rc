@@ -1,8 +1,11 @@
 #include <windows.h>
 
-// Embed the server binary (ID must match launcher.c)
-1 RCDATA "../server/server.exe"
+// Add this line:
+101 ICON "gallery_icon.ico"
 
+// Keep existing resources:
+
+1 RCDATA "../server/server.exe"
 // Version info
 1 VERSIONINFO
  FILEVERSION     1,0,0,0
