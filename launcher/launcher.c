@@ -9,6 +9,7 @@
 #define RETRY_DELAY 500 // 500ms
 #define SERVER_EXE_RESOURCE 1
 #define BUFFER_SIZE 4096
+#define SERVER_PORT "8234"
 
 // Extract embedded server.exe from resources
 // --- FIX: Changed signature to char* (non-const) to allow modification ---
