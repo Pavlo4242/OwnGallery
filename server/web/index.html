@@ -408,6 +408,8 @@
                 masonry.destroy();
                 masonry = null;
             }
+
+			grid.innerHTML = ''; // This clears the grid before loading new items
             
             let filesToShow = FOLDER_MAP[folderName] || [];
 
