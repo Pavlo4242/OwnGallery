@@ -1,7 +1,7 @@
 name: Build Media Gallery Launcher
 
 on:
-  push:
+#  push:
     branches: [ main, develop ]
     tags:
       - 'v*'
@@ -20,22 +20,22 @@ jobs:
             goos: windows
             goarch: amd64
             output: MediaGallery.exe
-      #    - os: windows-latest
-       #     goos: windows
-        #    goarch: arm64
-         #   output: MediaGallery-arm64.exe
-          #- os: ubuntu-latest
-          #  goos: linux
-         #   goarch: amd64
-      #      output: MediaGallery-linux
-      #    - os: macos-latest
-      #      goos: darwin
-      #      goarch: amd64
-      #      output: MediaGallery-mac-intel
-      #    - os: macos-latest
-      #      goos: darwin
-       #     goarch: arm64
-       #     output: MediaGallery-mac-m1
+           - os: windows-latest
+            goos: windows
+            goarch: arm64
+            output: MediaGallery-arm64.exe
+          # - os: ubuntu-latest
+            # goos: linux
+            # goarch: amd64
+            # output: MediaGallery-linux
+          # - os: macos-latest
+            # goos: darwin
+            # goarch: amd64
+            # output: MediaGallery-mac-intel
+          # - os: macos-latest
+            # goos: darwin
+            # goarch: arm64
+            # output: MediaGallery-mac-m1
 
     steps:
       - name: Checkout code
@@ -83,18 +83,21 @@ jobs:
         if: matrix.goos == 'windows'
         run: |
           cd launcher
+    
+          # Ensure server binary exists
+          cp ../server/server.exe ../server/server-${{ matrix.goarch }}.exe
           
           # Compile resource file
           windres resource.rc -O coff -o resource.res
           
           # Compile launcher with embedded server
           gcc -O3 -s -static -mwindows \
-            -o ../MediaGallery-${{ matrix.goarch }}.exe \
+            -o ../${{ matrix.output }} \
             launcher.c resource.res \
             -lshlwapi -lole32
           
-          # Embed the Go server binary as a resource
-          echo "Embedding server binary..."
+          echo "Launcher built: ${{ matrix.output }}"
+          ls -lh ../${{ matrix.output }}
           
       - name: Package with UPX compression
         if: matrix.goos == 'windows' || matrix.goos == 'linux'
