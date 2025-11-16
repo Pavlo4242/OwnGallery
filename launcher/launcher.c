@@ -198,11 +198,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     // Extract server binary
     snprintf(serverExePath, sizeof(serverExePath), "%sserver.exe", tempExePath);
     if (!ExtractServerBinary(serverExePath)) {
-        // (Error message box)
+         char errMsg[512];
+         snprintf(errMsg, sizeof(errMsg), 
+                  "Failed to extract server binary to:\n%s\n\nError code: %lu\n\n"
+                  "Try running as Administrator or check antivirus settings.",
+                  serverExePath, GetLastError());
+         MessageBox(NULL, errMsg, "Extraction Error", MB_ICONERROR | MB_OK);
         return 1;
     }
     if (!PathFileExists(serverExePath)) {
-        // (Error message box)
+         MessageBox(NULL, "Server binary extraction failed - file not found after extraction", 
+                    "Error", MB_ICONERROR);
         return 1;
     }
 
@@ -215,6 +221,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     
     // Launch server
     STARTUPINFO si = {sizeof(si)};
+    PROCESS_INFORMATION pi; // --- THIS LINE WAS MISSING ---
     si.dwFlags = STARTF_USESHOWWINDOW;
     si.wShowWindow = SW_HIDE;
     
