@@ -3,14 +3,16 @@
 #include <stdlib.h>
 #include <shlwapi.h>
 #include <shellapi.h>
+#include <time.h> // For the time() function
 
+#define MAX_RETRIES 3
+#define RETRY_DELAY 500 // 500ms
 #define SERVER_EXE_RESOURCE 1
 #define BUFFER_SIZE 4096
-#define SERVER_PORT "8443" // Define port here
-
 
 // Extract embedded server.exe from resources
-BOOL ExtractServerBinary(const char* outputPath) {
+// --- FIX: Changed signature to char* (non-const) to allow modification ---
+BOOL ExtractServerBinary(char* outputPath) {
     HRSRC hResInfo = FindResource(NULL, MAKEINTRESOURCE(SERVER_EXE_RESOURCE), RT_RCDATA);
     if (!hResInfo) return FALSE;
     
@@ -35,11 +37,14 @@ BOOL ExtractServerBinary(const char* outputPath) {
     char uniquePath[MAX_PATH];
     if (PathFileExists(outputPath)) {
         snprintf(uniquePath, sizeof(uniquePath), "%s.%d.exe", outputPath, (int)time(NULL));
-        strcpy((char*)outputPath, uniquePath);
+        // --- FIX: outputPath is now non-const, so this is safe ---
+        strcpy(outputPath, uniquePath);
     }
     
+    // --- FIX: Removed FILE_FLAG_DELETE_ON_CLOSE ---
+    // This flag was deleting the .exe immediately after extraction.
     HANDLE hFile = CreateFile(outputPath, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 
-                              FILE_ATTRIBUTE_NORMAL | FILE_FLAG_DELETE_ON_CLOSE, NULL);
+                              FILE_ATTRIBUTE_NORMAL, NULL);
     if (hFile == INVALID_HANDLE_VALUE) {
         return FALSE;
     }
@@ -87,30 +92,8 @@ void LaunchBrowser(const char* url) {
     CloseHandle(pi.hProcess);
     CloseHandle(pi.hThread);
 }
-    
-    // Try Edge
-    const char* edgePaths[] = {
-        "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
-        "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"
-    };
-    
-    for (int i = 0; i < 2; i++) {
-        if (PathFileExists(edgePaths[i])) {
-            snprintf(cmd, sizeof(cmd), "\"%s\" --ignore-certificate-errors --new-window \"%s\"", 
-                    edgePaths[i], url);
-            
-            if (CreateProcess(NULL, cmd, NULL, NULL, FALSE, CREATE_NO_WINDOW, 
-                            NULL, NULL, &si, &pi)) {
-                CloseHandle(pi.hProcess);
-                CloseHandle(pi.hThread);
-                return;
-            }
-        }
-    }
-    
-    // Fallback to default browser (without cert bypass)
-    ShellExecute(NULL, "open", url, NULL, NULL, SW_SHOWNORMAL);
-}
+
+// --- FIX: Deleted the duplicate, floating block of code that was here ---
 
 // Forcefully terminate process
 void TerminateServerProcess(HANDLE hProcess, DWORD processId) {
@@ -170,12 +153,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     // Create directory (ignore if exists)
     CreateDirectory(tempPath, NULL);
 
-    // Get port from command line or use default 8443 for HTTPS
-       char port[10] = "8443"; 
-       if (lpCmdLine && strlen(lpCmdLine) > 0) {
-         strncpy(port, lpCmdLine, sizeof(port) - 1);
-         port[sizeof(port) - 1] = '\0';
-     }
+    // Get port from command line or use default
+    char port[10] = "8443"; 
+    if (lpCmdLine && strlen(lpCmdLine) > 0) {
+       strncpy(port, lpCmdLine, sizeof(port) - 1);
+       port[sizeof(port) - 1] = '\0';
+    }
     
     // Extract server binary
     snprintf(serverPath, sizeof(serverPath), "%sserver.exe", tempPath);
@@ -183,9 +166,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     if (!ExtractServerBinary(serverPath)) {
         char errMsg[512];
         snprintf(errMsg, sizeof(errMsg), 
-                "Failed to extract server binary to:\n%s\n\nError code: %lu\n\n"
-                "Try running as Administrator or check antivirus settings.",
-                serverPath, GetLastError());
+                 "Failed to extract server binary to:\n%s\n\nError code: %lu\n\n"
+                 "Try running as Administrator or check antivirus settings.",
+                 serverPath, GetLastError());
         MessageBox(NULL, errMsg, "Extraction Error", MB_ICONERROR | MB_OK);
         return 1;
     }
@@ -193,22 +176,24 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     // Verify extraction succeeded
     if (!PathFileExists(serverPath)) {
         MessageBox(NULL, "Server binary extraction failed - file not found after extraction", 
-                  "Error", MB_ICONERROR);
+                   "Error", MB_ICONERROR);
         return 1;
     }
     
-     // Launch server with current directory as working dir AND the port
+     // Launch server
     STARTUPINFO si = {sizeof(si)};
     PROCESS_INFORMATION pi;
     si.dwFlags = STARTF_USESHOWWINDOW;
     si.wShowWindow = SW_HIDE;
     
     char cmdLine[BUFFER_SIZE];
-    // Pass currentDir (as context) and the port number
+    // Pass server path, current directory (as media dir), and the port
     snprintf(cmdLine, sizeof(cmdLine), "\"%s\" \"%s\" %s", serverPath, currentDir, port); 
     
+    // Set the server's working directory to NULL, as the Go server
+    // will use the os.Args[1] (currentDir) for its media path.
     if (!CreateProcess(NULL, cmdLine, NULL, NULL, FALSE, 
-                      CREATE_NO_WINDOW, NULL, currentDir, &si, &pi)) {
+                      CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) {
         MessageBox(NULL, "Failed to start server", "Error", MB_ICONERROR);
         return 1;
     }
@@ -216,12 +201,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     HANDLE hProcess = pi.hProcess;
     DWORD processId = pi.dwProcessId;
     
-        // Launch browser
+    // Launch browser
     char url[BUFFER_SIZE];
     snprintf(url, sizeof(url), "https://localhost:%s", port);
-    LaunchBrowser(url); // Updated LaunchBrowser to use the passed URL
-   
-// Create system tray icon
+    LaunchBrowser(url);
+    
+    // Create system tray icon
     NOTIFYICONDATA nid = {sizeof(nid)};
     nid.hWnd = GetConsoleWindow();
     nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
@@ -236,7 +221,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     // Cleanup system tray
     Shell_NotifyIcon(NIM_DELETE, &nid);
     
-    // Force terminate if still running
+    // Force terminate if still running (should be exited, but as a fallback)
     TerminateServerProcess(hProcess, processId);
     
     // Close handles
