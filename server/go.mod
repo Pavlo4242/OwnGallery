@@ -1,4 +1,4 @@
-module github.com/yourusername/media-gallery-launcher
+module github.com/Pavlo4242/OwnGallery
 
 go 1.21
 

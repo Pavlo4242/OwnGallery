@@ -1,11 +1,10 @@
 #include <windows.h>
 
-#define SERVER_EXE_RESOURCE 100
-
-SERVER_EXE_RESOURCE RCDATA "../server/server.exe"
+// Embed the server binary (ID must match launcher.c)
+1 RCDATA "../server/server.exe"
 
 // Version info
-VS_VERSION_INFO VERSIONINFO
+1 VERSIONINFO
  FILEVERSION     1,0,0,0
  PRODUCTVERSION  1,0,0,0
  FILEFLAGSMASK   0x3fL
@@ -22,7 +21,7 @@ BEGIN
             VALUE "FileDescription", "Local Media Gallery Launcher"
             VALUE "FileVersion", "1.0.0.0"
             VALUE "InternalName", "MediaGallery"
-            VALUE "LegalCopyright", "Open Source"
+            VALUE "LegalCopyright", "Open Source MIT License"
             VALUE "OriginalFilename", "MediaGallery.exe"
             VALUE "ProductName", "Media Gallery Launcher"
             VALUE "ProductVersion", "1.0.0.0"

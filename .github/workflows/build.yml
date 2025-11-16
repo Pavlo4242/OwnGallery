@@ -10,8 +10,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-    name: Build for ${{ matrix.os }}
+  build-go-server:
+    name: Build Go Server for ${{ matrix.platform }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -19,23 +19,11 @@ jobs:
           - os: windows-latest
             goos: windows
             goarch: amd64
-            output: MediaGallery.exe
+            platform: windows-amd64
           - os: windows-latest
             goos: windows
             goarch: arm64
-            output: MediaGallery-arm64.exe
-          # - os: ubuntu-latest
-            # goos: linux
-            # goarch: amd64
-            # output: MediaGallery-linux
-          # - os: macos-latest
-            # goos: darwin
-            # goarch: amd64
-            # output: MediaGallery-mac-intel
-          # - os: macos-latest
-            # goos: darwin
-            # goarch: arm64
-            # output: MediaGallery-mac-m1
+            platform: windows-arm64
 
     steps:
       - name: Checkout code
@@ -46,12 +34,6 @@ jobs:
         with:
           go-version: '1.21'
           cache: true
-
-      - name: Setup MinGW (Windows only)
-        if: matrix.goos == 'windows'
-        uses: egor-tensin/setup-mingw@v2
-        with:
-          platform: x64
 
       - name: Cache Go modules
         uses: actions/cache@v4
@@ -76,47 +58,85 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
         run: |
           cd server
-          go build -ldflags="-s -w -X main.Version=${{ github.ref_name }} -X main.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o server${{ matrix.goos == 'windows' && '.exe' || '' }} .
-          ls -lh server*
+          go build -ldflags="-s -w -X main.Version=${{ github.ref_name }} -X main.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o server.exe .
+          dir
 
-      - name: Build C Launcher (Windows)
-        if: matrix.goos == 'windows'
+      - name: Upload Go server artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-${{ matrix.platform }}
+          path: server/server.exe
+          retention-days: 1
+
+  build-launcher:
+    name: Build Launcher for ${{ matrix.platform }}
+    needs: build-go-server
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        include:
+          - platform: windows-amd64
+            output: MediaGallery.exe
+            goarch: amd64
+          - platform: windows-arm64
+            output: MediaGallery-arm64.exe
+            goarch: arm64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Go server
+        uses: actions/download-artifact@v4
+        with:
+          name: server-${{ matrix.platform }}
+          path: server/
+
+      - name: Install MinGW
+        run: |
+          choco install mingw --version=11.2.0 --force -y
+          $env:PATH = "C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin;$env:PATH"
+          gcc --version
+
+      - name: Verify server.exe exists
+        run: |
+          dir server
+          if (!(Test-Path "server\server.exe")) {
+            throw "server.exe not found!"
+          }
+
+      - name: Build resource file
+        shell: cmd
         run: |
           cd launcher
-    
-          # Ensure server binary exists
-          cp ../server/server.exe ../server/server-${{ matrix.goarch }}.exe
-          
-          # Compile resource file
           windres resource.rc -O coff -o resource.res
-          
-          # Compile launcher with embedded server
-          gcc -O3 -s -static -mwindows \
-            -o ../${{ matrix.output }} \
-            launcher.c resource.res \
-            -lshlwapi -lole32
-          
-          echo "Launcher built: ${{ matrix.output }}"
-          ls -lh ../${{ matrix.output }}
-          
-      - name: Package with UPX compression
-        if: matrix.goos == 'windows' || matrix.goos == 'linux'
-        uses: crazy-max/ghaction-upx@v3
-        with:
-          version: latest
-          files: |
-            ${{ matrix.output }}
-          args: --best --lzma
+          if errorlevel 1 exit /b 1
+          dir
+
+      - name: Build C launcher
+        shell: cmd
+        run: |
+          cd launcher
+          gcc -v
+          gcc -O3 -s -static -mwindows -o ..\${{ matrix.output }} launcher.c resource.res -lshlwapi -lole32
+          if errorlevel 1 exit /b 1
+          cd ..
+          dir
+
+      - name: Verify build
+        run: |
+          if (!(Test-Path "${{ matrix.output }}")) {
+            throw "Launcher build failed - ${{ matrix.output }} not found!"
+          }
+          $size = (Get-Item "${{ matrix.output }}").Length / 1MB
+          Write-Host "Build successful! Size: $([math]::Round($size, 2)) MB"
 
       - name: Create portable package
         run: |
-          mkdir -p dist
+          New-Item -ItemType Directory -Force -Path dist
+          Copy-Item ${{ matrix.output }} dist/
           
-          # Copy executable
-          cp ${{ matrix.output }} dist/
-          
-          # Create README
-          cat > dist/README.txt << 'EOF'
+          @"
           Media Gallery Launcher
           ======================
           
@@ -126,8 +146,8 @@ jobs:
           3. Browser will open automatically with your gallery
           
           Supported formats:
-          - Images: JPG, PNG, WebP, GIF
-          - Videos: MP4, WebM, OGG
+          - Images: JPG, PNG, WebP, GIF, BMP
+          - Videos: MP4, WebM, OGG, MOV, AVI
           
           Keyboard shortcuts in gallery:
           - Arrow keys / A/D: Navigate
@@ -136,17 +156,14 @@ jobs:
           - Mouse wheel: Adjust speed
           
           Version: ${{ github.ref_name }}
-          Built: $(date -u +"%Y-%m-%d %H:%M UTC")
-          EOF
+          Built: $(Get-Date -Format "yyyy-MM-dd HH:mm") UTC
+          "@ | Out-File -FilePath dist\README.txt -Encoding UTF8
 
       - name: Calculate checksums
         run: |
           cd dist
-          if [ "${{ matrix.goos }}" = "windows" ]; then
-            certutil -hashfile ${{ matrix.output }} SHA256 > ${{ matrix.output }}.sha256
-          else
-            shasum -a 256 ${{ matrix.output }} > ${{ matrix.output }}.sha256
-          fi
+          $hash = Get-FileHash ${{ matrix.output }} -Algorithm SHA256
+          "$($hash.Hash)  ${{ matrix.output }}" | Out-File -FilePath "${{ matrix.output }}.sha256" -Encoding ASCII
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -158,7 +175,7 @@ jobs:
   release:
     name: Create Release
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [build-launcher]
     if: startsWith(github.ref, 'refs/tags/v')
     
     steps:
@@ -167,6 +184,10 @@ jobs:
         with:
           path: artifacts
 
+      - name: Display structure
+        run: |
+          ls -R artifacts/
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
@@ -174,14 +195,11 @@ jobs:
           body: |
             ## Media Gallery Launcher ${{ github.ref_name }}
             
-            ### Downloads
+            ### 📥 Downloads
             - **Windows (x64)**: MediaGallery.exe
             - **Windows (ARM64)**: MediaGallery-arm64.exe
-            - **Linux (x64)**: MediaGallery-linux
-            - **macOS (Intel)**: MediaGallery-mac-intel
-            - **macOS (M1/M2)**: MediaGallery-mac-m1
             
-            ### Features
+            ### ✨ Features
             - 🚀 Single executable - no installation needed
             - 🔒 HTTPS server with auto-generated certificates
             - 🎨 Beautiful masonry gallery layout
@@ -190,58 +208,25 @@ jobs:
             - 📁 Automatic folder organization
             - 🔄 Shuffle with viewed tracking
             
-            ### Usage
+            ### 🎯 Usage
             1. Download the executable for your platform
             2. Drop it into any folder with images/videos
             3. Double-click to launch
-            4. Gallery opens automatically in your browser
+            4. Gallery opens automatically in your browser at https://localhost:8443
+            5. Accept the security warning (self-signed certificate)
             
-            ### Changelog
-            See [CHANGELOG.md](CHANGELOG.md) for details.
+            ### 🐛 Known Issues
+            - Browser will show security warning (expected - self-signed cert)
+            - Windows Defender might flag first run (false positive)
+            
+            ### 📝 Changelog
+            - Initial release
+            - Full feature set implemented
           files: |
-            artifacts/**/*
+            artifacts/**/*.exe
+            artifacts/**/*.txt
+            artifacts/**/*.sha256
           draft: false
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  docker:
-    name: Build Docker Image
-    runs-on: ubuntu-latest
-    needs: build
-    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ github.repository }}
-          tags: |
-            type=ref,event=branch
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha
-
-      - name: Build and push
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
