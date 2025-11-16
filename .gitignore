@@ -1,0 +1,30 @@
+# Binaries
+*.exe
+*.dll
+*.so
+*.dylib
+server/server
+MediaGallery*
+!MediaGallery.exe.template
+
+# Build artifacts
+dist/
+artifacts/
+*.res
+*.o
+
+# OS files
+.DS_Store
+Thumbs.db
+filelist.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Test data
+test-data/*.jpg
+test-data/*.png
+test-data/*.mp4
