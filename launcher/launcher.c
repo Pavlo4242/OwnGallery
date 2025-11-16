@@ -9,7 +9,7 @@
 #define RETRY_DELAY 500 // 500ms
 #define SERVER_EXE_RESOURCE 1
 #define BUFFER_SIZE 4096
-#define SERVER_PORT "8234"
+
 
 // Extract embedded server.exe from resources
 // --- FIX: Changed signature to char* (non-const) to allow modification ---
@@ -155,7 +155,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     CreateDirectory(tempPath, NULL);
 
     // Get port from command line or use default
-    char port[10] = "8443"; 
+    char port[10] = "8987"; 
     if (lpCmdLine && strlen(lpCmdLine) > 0) {
        strncpy(port, lpCmdLine, sizeof(port) - 1);
        port[sizeof(port) - 1] = '\0';
