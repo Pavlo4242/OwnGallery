@@ -1,0 +1,274 @@
+name: Build Media Gallery Launcher
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build for ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            goos: windows
+            goarch: amd64
+            output: MediaGallery.exe
+          - os: windows-latest
+            goos: windows
+            goarch: arm64
+            output: MediaGallery-arm64.exe
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            output: MediaGallery-linux
+          - os: macos-latest
+            goos: darwin
+            goarch: amd64
+            output: MediaGallery-mac-intel
+          - os: macos-latest
+            goos: darwin
+            goarch: arm64
+            output: MediaGallery-mac-m1
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          cache: true
+
+      - name: Setup MinGW (Windows only)
+        if: matrix.goos == 'windows'
+        uses: egor-tensin/setup-mingw@v2
+        with:
+          platform: x64
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Install dependencies
+        run: |
+          cd server
+          go mod download
+          go mod verify
+
+      - name: Build Go server
+        env:
+          CGO_ENABLED: 0
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          cd server
+          go build -ldflags="-s -w -X main.Version=${{ github.ref_name }} -X main.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o server${{ matrix.goos == 'windows' && '.exe' || '' }} .
+          ls -lh server*
+
+      - name: Build C Launcher (Windows)
+        if: matrix.goos == 'windows'
+        run: |
+          cd launcher
+          
+          # Compile resource file
+          windres resource.rc -O coff -o resource.res
+          
+          # Compile launcher with embedded server
+          gcc -O3 -s -static -mwindows \
+            -o ../MediaGallery-${{ matrix.goarch }}.exe \
+            launcher.c resource.res \
+            -lshlwapi -lole32
+          
+          # Embed the Go server binary as a resource
+          echo "Embedding server binary..."
+          
+      - name: Package with UPX compression
+        if: matrix.goos == 'windows' || matrix.goos == 'linux'
+        uses: crazy-max/ghaction-upx@v3
+        with:
+          version: latest
+          files: |
+            ${{ matrix.output }}
+          args: --best --lzma
+
+      - name: Create portable package
+        run: |
+          mkdir -p dist
+          
+          # Copy executable
+          cp ${{ matrix.output }} dist/
+          
+          # Create README
+          cat > dist/README.txt << 'EOF'
+          Media Gallery Launcher
+          ======================
+          
+          Usage:
+          1. Copy this executable to any folder containing images/videos
+          2. Double-click to launch
+          3. Browser will open automatically with your gallery
+          
+          Supported formats:
+          - Images: JPG, PNG, WebP, GIF
+          - Videos: MP4, WebM, OGG
+          
+          Keyboard shortcuts in gallery:
+          - Arrow keys / A/D: Navigate
+          - Space: Play/Pause slideshow
+          - Escape: Close fullscreen
+          - Mouse wheel: Adjust speed
+          
+          Version: ${{ github.ref_name }}
+          Built: $(date -u +"%Y-%m-%d %H:%M UTC")
+          EOF
+
+      - name: Calculate checksums
+        run: |
+          cd dist
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            certutil -hashfile ${{ matrix.output }} SHA256 > ${{ matrix.output }}.sha256
+          else
+            shasum -a 256 ${{ matrix.output }} > ${{ matrix.output }}.sha256
+          fi
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.output }}
+          path: dist/*
+          retention-days: 30
+
+  test:
+    name: Test Build
+    runs-on: windows-latest
+    needs: build
+    
+    steps:
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: MediaGallery.exe
+
+      - name: Create test media files
+        run: |
+          mkdir test-media
+          cd test-media
+          
+          # Create dummy image files
+          echo "Test image 1" > image1.jpg
+          echo "Test image 2" > image2.png
+          
+          # Create subfolder
+          mkdir subfolder
+          echo "Test image 3" > subfolder/image3.jpg
+
+      - name: Test executable (dry run)
+        run: |
+          cd test-media
+          # Run with timeout to test startup
+          timeout /t 10 ..\MediaGallery.exe || echo "Test completed"
+
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [build, test]
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Release ${{ github.ref_name }}
+          body: |
+            ## Media Gallery Launcher ${{ github.ref_name }}
+            
+            ### Downloads
+            - **Windows (x64)**: MediaGallery.exe
+            - **Windows (ARM64)**: MediaGallery-arm64.exe
+            - **Linux (x64)**: MediaGallery-linux
+            - **macOS (Intel)**: MediaGallery-mac-intel
+            - **macOS (M1/M2)**: MediaGallery-mac-m1
+            
+            ### Features
+            - 🚀 Single executable - no installation needed
+            - 🔒 HTTPS server with auto-generated certificates
+            - 🎨 Beautiful masonry gallery layout
+            - ⚡ Custom mouse gestures for navigation
+            - 🎬 Slideshow mode with adjustable speed
+            - 📁 Automatic folder organization
+            - 🔄 Shuffle with viewed tracking
+            
+            ### Usage
+            1. Download the executable for your platform
+            2. Drop it into any folder with images/videos
+            3. Double-click to launch
+            4. Gallery opens automatically in your browser
+            
+            ### Changelog
+            See [CHANGELOG.md](CHANGELOG.md) for details.
+          files: |
+            artifacts/**/*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  docker:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

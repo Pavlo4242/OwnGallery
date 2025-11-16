@@ -1,4 +1,4 @@
-gopackage main
+package main
 
 import (
 	"crypto/rand"
@@ -9,6 +9,7 @@ import (
 	"embed"
 	"encoding/json"
 	"encoding/pem"
+	"fmt"
 	"io/fs"
 	"log"
 	"math/big"
@@ -24,59 +25,126 @@ import (
 //go:embed web/*
 var webFiles embed.FS
 
+var (
+	Version   = "dev"
+	BuildTime = "unknown"
+)
+
+type FileInfo struct {
+	Path     string `json:"path"`
+	Name     string `json:"name"`
+	Size     int64  `json:"size"`
+	Modified string `json:"modified"`
+	IsVideo  bool   `json:"isVideo"`
+}
+
 func main() {
-	mediaDir, _ := os.Getwd()
-	
+	log.Printf("Media Gallery Server %s (built %s)", Version, BuildTime)
+
+	mediaDir, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Printf("Serving media from: %s", mediaDir)
+
 	// Generate filelist.json
 	if err := generateFileList(mediaDir); err != nil {
 		log.Printf("Warning: Could not generate filelist: %v", err)
 	}
 
-	// Serve embedded web files
-	webFS, _ := fs.Sub(webFiles, "web")
-	http.Handle("/", http.FileServer(http.FS(webFS)))
-
-	// Serve media from current directory
-	http.Handle("/media/", http.StripPrefix("/media/",
-		addCORSHeaders(http.FileServer(http.Dir(mediaDir)))))
+	// Setup routes
+	setupRoutes(mediaDir)
 
 	// Generate self-signed certificate
 	cert, err := generateCertificate()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Failed to generate certificate: %v", err)
 	}
 
 	url := "https://localhost:8443"
 	log.Printf("🚀 Gallery ready at: %s", url)
+	log.Printf("Press Ctrl+C to stop")
 
-	// Auto-open browser
-	go openBrowser(url)
+	// Auto-open browser after a delay
+	go func() {
+		time.Sleep(1500 * time.Millisecond)
+		openBrowser(url)
+	}()
 
+	// Start HTTPS server
 	server := &http.Server{
-		Addr: ":8443",
+		Addr:         ":8443",
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
 		TLSConfig: &tls.Config{
 			Certificates: []tls.Certificate{cert},
+			MinVersion:   tls.VersionTLS12,
 		},
 	}
 
 	log.Fatal(server.ListenAndServeTLS("", ""))
 }
 
+func setupRoutes(mediaDir string) {
+	// Serve embedded web files
+	webFS, err := fs.Sub(webFiles, "web")
+	if err != nil {
+		log.Fatal(err)
+	}
+	http.Handle("/", corsMiddleware(http.FileServer(http.FS(webFS))))
+
+	// Serve media files from current directory
+	http.Handle("/media/", corsMiddleware(
+		http.StripPrefix("/media/", http.FileServer(http.Dir(mediaDir)))))
+
+	// API endpoint for file list (with details)
+	http.HandleFunc("/api/files", func(w http.ResponseWriter, r *http.Request) {
+		files, err := getDetailedFileList(mediaDir)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(files)
+	})
+
+	// Health check endpoint
+	http.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{
+			"status":  "ok",
+			"version": Version,
+		})
+	})
+}
+
 func generateFileList(dir string) error {
 	extensions := map[string]bool{
 		".jpg": true, ".jpeg": true, ".png": true, ".webp": true,
 		".gif": true, ".mp4": true, ".webm": true, ".ogg": true,
+		".bmp": true, ".svg": true, ".mov": true, ".avi": true,
 	}
 
 	var files []string
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() {
+		if err != nil {
 			return err
+		}
+
+		// Skip hidden files/folders and the executable itself
+		if info.IsDir() || strings.HasPrefix(info.Name(), ".") {
+			return nil
 		}
 
 		ext := strings.ToLower(filepath.Ext(path))
 		if extensions[ext] {
-			relPath, _ := filepath.Rel(dir, path)
+			relPath, err := filepath.Rel(dir, path)
+			if err != nil {
+				return err
+			}
+			// Convert to forward slashes for web compatibility
 			files = append(files, filepath.ToSlash(relPath))
 		}
 		return nil
@@ -86,17 +154,62 @@ func generateFileList(dir string) error {
 		return err
 	}
 
-	data, _ := json.Marshal(files)
+	log.Printf("Found %d media files", len(files))
+
+	data, err := json.MarshalIndent(files, "", "  ")
+	if err != nil {
+		return err
+	}
+
 	return os.WriteFile(filepath.Join(dir, "filelist.json"), data, 0644)
 }
 
+func getDetailedFileList(dir string) ([]FileInfo, error) {
+	extensions := map[string]bool{
+		".jpg": false, ".jpeg": false, ".png": false, ".webp": false,
+		".gif": false, ".mp4": true, ".webm": true, ".ogg": true,
+		".bmp": false, ".svg": false, ".mov": true, ".avi": true,
+	}
+
+	var files []FileInfo
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() || strings.HasPrefix(info.Name(), ".") {
+			return err
+		}
+
+		ext := strings.ToLower(filepath.Ext(path))
+		if isVideo, exists := extensions[ext]; exists {
+			relPath, _ := filepath.Rel(dir, path)
+			files = append(files, FileInfo{
+				Path:     filepath.ToSlash(relPath),
+				Name:     info.Name(),
+				Size:     info.Size(),
+				Modified: info.ModTime().Format(time.RFC3339),
+				IsVideo:  isVideo,
+			})
+		}
+		return nil
+	})
+
+	return files, err
+}
+
 func generateCertificate() (tls.Certificate, error) {
-	priv, _ := rsa.GenerateKey(rand.Reader, 2048)
+	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return tls.Certificate{}, err
+	}
+
+	serialNumber, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
+	if err != nil {
+		return tls.Certificate{}, err
+	}
 
 	template := x509.Certificate{
-		SerialNumber: big.NewInt(1),
+		SerialNumber: serialNumber,
 		Subject: pkix.Name{
-			Organization: []string{"Local Gallery"},
+			Organization: []string{"Media Gallery Local Server"},
+			CommonName:   "localhost",
 		},
 		NotBefore:             time.Now(),
 		NotAfter:              time.Now().Add(365 * 24 * time.Hour),
@@ -104,9 +217,13 @@ func generateCertificate() (tls.Certificate, error) {
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		BasicConstraintsValid: true,
 		DNSNames:              []string{"localhost"},
+		IPAddresses:           []string{"127.0.0.1"},
 	}
 
-	certDER, _ := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
+	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
+	if err != nil {
+		return tls.Certificate{}, err
+	}
 
 	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
 	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)})
@@ -114,32 +231,84 @@ func generateCertificate() (tls.Certificate, error) {
 	return tls.X509KeyPair(certPEM, keyPEM)
 }
 
-func addCORSHeaders(h http.Handler) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-		h.ServeHTTP(w, r)
-	}
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Set("Cache-Control", "public, max-age=3600")
+
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }
 
 func openBrowser(url string) {
-	time.Sleep(1 * time.Second)
-
 	var cmd *exec.Cmd
+
 	switch runtime.GOOS {
 	case "windows":
-		cmd = exec.Command("cmd", "/c", "start", "chrome", "--ignore-certificate-errors", url)
-		if err := cmd.Run(); err != nil {
-			// Fallback to Edge
-			cmd = exec.Command("cmd", "/c", "start", "msedge", "--ignore-certificate-errors", url)
-			cmd.Run()
+		// Try Chrome with cert bypass
+		chromePath := findChrome()
+		if chromePath != "" {
+			cmd = exec.Command(chromePath, "--ignore-certificate-errors", "--new-window", url)
+			if err := cmd.Start(); err == nil {
+				log.Println("Opened in Chrome")
+				return
+			}
 		}
+
+		// Try Edge with cert bypass
+		edgePath := findEdge()
+		if edgePath != "" {
+			cmd = exec.Command(edgePath, "--ignore-certificate-errors", "--new-window", url)
+			if err := cmd.Start(); err == nil {
+				log.Println("Opened in Edge")
+				return
+			}
+		}
+
+		// Fallback to default browser
+		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
+		cmd.Start()
+
 	case "darwin":
 		cmd = exec.Command("open", url)
-		cmd.Run()
+		cmd.Start()
+
 	case "linux":
 		cmd = exec.Command("xdg-open", url)
-		cmd.Run()
+		cmd.Start()
 	}
+}
+
+func findChrome() string {
+	paths := []string{
+		"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+		"C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+		os.Getenv("LOCALAPPDATA") + "\\Google\\Chrome\\Application\\chrome.exe",
+	}
+	for _, p := range paths {
+		if _, err := os.Stat(p); err == nil {
+			return p
+		}
+	}
+	return ""
+}
+
+func findEdge() string {
+	paths := []string{
+		"C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
+		"C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+	}
+	for _, p := range paths {
+		if _, err := os.Stat(p); err == nil {
+			return p
+		}
+	}
+	return ""
 }
