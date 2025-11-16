@@ -1,4 +1,4 @@
-# 🎨 Media Gallery Launcher
+c# 🎨 Media Gallery Launcher
 
 **Drop-in executable that instantly launches a beautiful HTTPS gallery for any folder**
 
@@ -109,16 +109,18 @@ Use the folder dropdown to filter by subfolder!
 ## 🔧 Advanced Usage
 
 ### Command Line Options
+### Command Line Options
 
 ```bash
-# Specify custom port
-./MediaGallery --port 9443
+# Specify custom port (Windows)
+MediaGallery.exe 8987
 
-# Disable auto-browser launch
-./MediaGallery --no-browser
+# Specify custom port (Linux/macOS)
+./MediaGallery 8987
 
-# Custom media directory
-./MediaGallery --dir /path/to/media
+# --- THE FOLLOWING FLAGS ARE NOT SUPPORTED BY THE LAUNCHER ---
+# ./MediaGallery --no-browser
+# ./MediaGallery --dir /path/to/media
 ```
 
 ### API Endpoints

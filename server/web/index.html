@@ -311,11 +311,14 @@
             grid.innerHTML = '<div class="loading">Loading media files</div>';
             
             try {
-                const response = await fetch('/media/filelist.json');
-                
+                <!-- const response = await fetch('/media/filelist.json');  change for python -->
+                const response = await fetch('/api/files');
+				
                 if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: Could not load filelist.json`);
+                    <!-- throw new Error(`HTTP ${response.status}: Could not load filelist.json`); -->
+					throw new Error(`HTTP ${response.status}: Could not load file list from /api/files`);
                 }
+                
                 
                 const fileList = await response.json();
                 
@@ -327,7 +330,37 @@
                 FOLDER_MAP = { 'all': [] };
                 MEDIA_DATA = {};
                 
-                fileList.forEach((relativePath) => {
+				
+				
+                <!-- fileList.forEach((relativePath) => { -->
+                    <!-- const webUrl = '/media/' + relativePath; -->
+                    <!-- MEDIA_DATA[relativePath] = webUrl; -->
+                    <!-- FOLDER_MAP['all'].push(relativePath); -->
+                    
+                    <!-- const parts = relativePath.split('/'); -->
+                    <!-- if (parts.length > 1) { -->
+                        <!-- const folderName = parts.slice(0, -1).join('/'); -->
+                        <!-- if (!FOLDER_MAP[folderName]) { -->
+                            <!-- FOLDER_MAP[folderName] = []; -->
+                        <!-- } -->
+                        <!-- FOLDER_MAP[folderName].push(relativePath); -->
+                    <!-- } -->
+                <!-- }); -->
+                
+                <!-- populateFolderFilter(); -->
+                <!-- filterGalleryByFolder(); -->
+                
+            <!-- } catch (error) { -->
+                <!-- console.error('Error:', error); -->
+                <!-- grid.innerHTML = `<div class="loading">Error: ${error.message}</div>`; -->
+            <!-- } -->
+        <!-- } -->
+		
+		
+		<!-- // --- NEW FOR UPDATING FROM DIR ---  // The API returns an array of FileInfo objects, not strings. -->
+		<!-- Remember to update Main.go for the same logic change  -->
+                fileList.forEach((fileInfo) => {
+                    const relativePath = fileInfo.path; // Get path from the object
                     const webUrl = '/media/' + relativePath;
                     MEDIA_DATA[relativePath] = webUrl;
                     FOLDER_MAP['all'].push(relativePath);

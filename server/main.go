@@ -47,7 +47,7 @@ func main() {
 	}
 
 // Read port from command line arguments passed by the launcher
-	port := "8443" // Default TLS port
+	port := "8987" // Default TLS port
 	if len(os.Args) > 1 {
 		// os.Args[0] is program name, os.Args[1] is mediaDir (passed by launcher), os.Args[2] is port
 		if len(os.Args) > 2 {
@@ -59,14 +59,14 @@ func main() {
 		mediaDir = os.Args[1]
 	}
 
-
-
 	log.Printf("Serving media from: %s", mediaDir)
 
-	// Generate filelist.json
+
+// REMOVED - no longer using filelist.json
+/* 	// Generate filelist.json
 	if err := generateFileList(mediaDir); err != nil {
 		log.Printf("Warning: Could not generate filelist: %v", err)
-	}
+	} */
 
 	// Setup routes
 	setupRoutes(mediaDir)
