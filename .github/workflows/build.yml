@@ -20,7 +20,7 @@ jobs:
             goos: windows
             goarch: amd64
             output: MediaGallery.exe
-           - os: windows-latest
+          - os: windows-latest
             goos: windows
             goarch: arm64
             output: MediaGallery-arm64.exe
