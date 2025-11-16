@@ -5,6 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Media Gallery</title>
     <style>
+        * {
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             margin: 0;
@@ -21,6 +28,44 @@
             top: 0;
             z-index: 100;
             backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .controls-left, .controls-center, .controls-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .controls-center {
+            flex: 1;
+            justify-content: center;
+        }
+
+        .current-folder {
+            background-color: rgba(76, 175, 80, 0.2);
+            border: 1px solid #4CAF50;
+            padding: 8px 16px;
+            border-radius: 6px;
+            color: #4CAF50;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .file-counter {
+            background-color: rgba(33, 150, 243, 0.2);
+            border: 1px solid #2196F3;
+            padding: 8px 16px;
+            border-radius: 6px;
+            color: #2196F3;
+            font-weight: 500;
         }
 
         .controls label {
@@ -64,11 +109,16 @@
             border-radius: 12px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.3);
             transition: transform 0.3s ease, box-shadow 0.3s ease;
+            position: relative;
         }
 
         .grid-item:hover {
             transform: translateY(-8px);
             box-shadow: 0 12px 24px rgba(0,0,0,0.5);
+        }
+
+        .grid-item:hover .item-info {
+            opacity: 1;
         }
 
         .grid-item img,
@@ -77,6 +127,33 @@
             width: 100%;
             height: auto;
             border-radius: 12px;
+            pointer-events: none;
+        }
+
+        .item-info {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
+            padding: 8px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 11px;
+            color: #fff;
+        }
+
+        .item-name {
+            font-weight: 500;
+            margin-bottom: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .item-type {
+            color: #888;
+            font-size: 10px;
         }
 
         .fullscreen-overlay {
@@ -117,6 +194,7 @@
             max-height: calc(100vh - 40px);
             object-fit: contain;
             border-radius: 8px;
+            pointer-events: none;
         }
 
         .nav-btn {
@@ -179,14 +257,41 @@
         .media-info {
             position: absolute;
             bottom: 30px;
-            left: 30px;
+            left: 50%;
+            transform: translateX(-50%);
             color: white;
             background-color: rgba(0, 0, 0, 0.8);
             padding: 12px 24px;
             border-radius: 25px;
-            font-size: 16px;
+            font-size: 14px;
             z-index: 1002;
             backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            max-width: 80%;
+        }
+
+        .media-counter {
+            font-size: 16px;
+            font-weight: 600;
+            color: #4CAF50;
+        }
+
+        .media-filename {
+            font-size: 13px;
+            color: #e0e0e0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+        }
+
+        .media-filetype {
+            font-size: 11px;
+            color: #888;
+            text-transform: uppercase;
         }
 
         .playback-controls {
@@ -253,32 +358,67 @@
             40% { content: '..'; }
             60%, 100% { content: '...'; }
         }
+
+        .scroll-progress {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: rgba(0, 0, 0, 0.8);
+            padding: 10px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            color: #888;
+            backdrop-filter: blur(10px);
+            z-index: 99;
+        }
     </style>
 </head>
 <body>
     <div class="controls">
-        <button onclick="initializeGallery()">🔄 Reload Gallery</button>
-        <label for="thumbnailWidth">Size:</label>
-        <input type="range" id="thumbnailWidth" min="150" max="400" value="250">
-        <label for="folderFilter">Folder:</label>
-        <select id="folderFilter" onchange="filterGalleryByFolder()">
-            <option value="all">All Files</option>
-        </select>
-        <label>
-            <input type="checkbox" id="shuffleToggle"> Shuffle
-        </label>
-        <button onclick="forceReshuffle()">🔀 Re-shuffle</button>
-        <button onclick="resetViewed()">↺ Reset Viewed</button>
+        <div class="controls-left">
+            <div class="current-folder" id="currentFolder">
+                <span>📁</span>
+                <span id="folderName">Loading...</span>
+            </div>
+            <div class="file-counter" id="fileCounter">0 files</div>
+        </div>
+        
+        <div class="controls-center">
+            <button onclick="initializeGallery()">🔄 Reload</button>
+            <label for="thumbnailWidth">Size:</label>
+            <input type="range" id="thumbnailWidth" min="150" max="400" value="250">
+            <label for="folderFilter">Folder:</label>
+            <select id="folderFilter" onchange="filterGalleryByFolder()">
+                <option value="all">All Files</option>
+            </select>
+            <label>
+                <input type="checkbox" id="shuffleToggle"> Shuffle
+            </label>
+            <button onclick="forceReshuffle()">🔀 Re-shuffle</button>
+            <button onclick="resetViewed()">↺ Reset Viewed</button>
+        </div>
+        
+        <div class="controls-right">
+            <!-- Placeholder for future buttons -->
+        </div>
     </div>
 
     <div class="grid"></div>
+    
+    <div class="scroll-progress" id="scrollProgress">
+        Loaded: <span id="loadedCount">0</span> / <span id="totalCount">0</span>
+    </div>
 
     <div id="fullscreenOverlay" class="fullscreen-overlay">
         <span class="close-btn">&times;</span>
         <button class="nav-btn prev-btn" id="prevBtn">‹</button>
         <button class="nav-btn next-btn" id="nextBtn">›</button>
         <div class="fullscreen-content"></div>
-        <div class="media-info" id="mediaInfo"></div>
+        <div class="media-info" id="mediaInfo">
+            <div class="media-counter"></div>
+            <div class="media-filename"></div>
+            <div class="media-filetype"></div>
+        </div>
         <div class="playback-controls" id="playbackControls">
             <button id="playPauseBtn">▶ Play</button>
             <div style="text-align: center;">
@@ -305,20 +445,33 @@
         let isPlaying = false;
         let viewedFiles = new Set();
         let controlsHideTimer = null;
+        let currentFolderPath = '';
+
+        function updateFileCounter() {
+            const total = allMediaFiles.length;
+            const loaded = Math.min(loadedMediaCount, total);
+            document.getElementById('fileCounter').textContent = `${total} files`;
+            document.getElementById('loadedCount').textContent = loaded;
+            document.getElementById('totalCount').textContent = total;
+        }
+
+        function updateCurrentFolder() {
+            // Extract folder name from path
+            const parts = currentFolderPath.split(/[/\\]/);
+            const folderName = parts[parts.length - 1] || parts[parts.length - 2] || 'Root';
+            document.getElementById('folderName').textContent = folderName;
+        }
 
         async function initializeGallery() {
             const grid = document.querySelector('.grid');
             grid.innerHTML = '<div class="loading">Loading media files</div>';
             
             try {
-                <!-- const response = await fetch('/media/filelist.json');  change for python -->
                 const response = await fetch('/api/files');
 				
                 if (!response.ok) {
-                    <!-- throw new Error(`HTTP ${response.status}: Could not load filelist.json`); -->
 					throw new Error(`HTTP ${response.status}: Could not load file list from /api/files`);
                 }
-                
                 
                 const fileList = await response.json();
                 
@@ -330,39 +483,14 @@
                 FOLDER_MAP = { 'all': [] };
                 MEDIA_DATA = {};
                 
-				
-				
-                <!-- fileList.forEach((relativePath) => { -->
-                    <!-- const webUrl = '/media/' + relativePath; -->
-                    <!-- MEDIA_DATA[relativePath] = webUrl; -->
-                    <!-- FOLDER_MAP['all'].push(relativePath); -->
-                    
-                    <!-- const parts = relativePath.split('/'); -->
-                    <!-- if (parts.length > 1) { -->
-                        <!-- const folderName = parts.slice(0, -1).join('/'); -->
-                        <!-- if (!FOLDER_MAP[folderName]) { -->
-                            <!-- FOLDER_MAP[folderName] = []; -->
-                        <!-- } -->
-                        <!-- FOLDER_MAP[folderName].push(relativePath); -->
-                    <!-- } -->
-                <!-- }); -->
-                
-                <!-- populateFolderFilter(); -->
-                <!-- filterGalleryByFolder(); -->
-                
-            <!-- } catch (error) { -->
-                <!-- console.error('Error:', error); -->
-                <!-- grid.innerHTML = `<div class="loading">Error: ${error.message}</div>`; -->
-            <!-- } -->
-        <!-- } -->
-		
-		
-		<!-- // --- NEW FOR UPDATING FROM DIR ---  // The API returns an array of FileInfo objects, not strings. -->
-		<!-- Remember to update Main.go for the same logic change  -->
                 fileList.forEach((fileInfo) => {
-                    const relativePath = fileInfo.path; // Get path from the object
+                    const relativePath = fileInfo.path;
                     const webUrl = '/media/' + relativePath;
-                    MEDIA_DATA[relativePath] = webUrl;
+                    MEDIA_DATA[relativePath] = {
+                        url: webUrl,
+                        name: fileInfo.name,
+                        isVideo: fileInfo.isVideo
+                    };
                     FOLDER_MAP['all'].push(relativePath);
                     
                     const parts = relativePath.split('/');
@@ -375,6 +503,8 @@
                     }
                 });
                 
+                currentFolderPath = 'Root';
+                updateCurrentFolder();
                 populateFolderFilter();
                 filterGalleryByFolder();
                 
@@ -404,15 +534,17 @@
             const grid = document.querySelector('.grid');
             const shuffleEnabled = document.getElementById('shuffleToggle').checked;
             
-             if (masonry) {
+            currentFolderPath = folderName === 'all' ? 'Root' : folderName;
+            updateCurrentFolder();
+            
+            if (masonry) {
                 masonry.destroy();
                 masonry = null;
             }
 
-			grid.innerHTML = ''; // This clears the grid before loading new items
+			grid.innerHTML = '';
             
             let filesToShow = FOLDER_MAP[folderName] || [];
-
             let displayList = [...filesToShow];
             
             if (shuffleEnabled) {
@@ -421,6 +553,7 @@
             
             allMediaFiles = displayList;
             loadedMediaCount = 0;
+            updateFileCounter();
             loadMoreMedia();
         }
 
@@ -459,8 +592,14 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
+        function getFileExtension(fileName) {
+            const parts = fileName.split('.');
+            return parts.length > 1 ? parts[parts.length - 1].toUpperCase() : 'FILE';
+        }
+
         function createMediaElement(fileName) {
-            const isVideo = fileName.toLowerCase().match(/\.(mp4|webm|ogg|mov|avi)$/);
+            const mediaInfo = MEDIA_DATA[fileName];
+            const isVideo = mediaInfo.isVideo;
             let mediaElement;
 
             if (isVideo) {
@@ -474,7 +613,7 @@
                 mediaElement.loading = 'lazy';
             }
 
-            mediaElement.src = MEDIA_DATA[fileName];
+            mediaElement.src = mediaInfo.url;
             return mediaElement;
         }
 
@@ -497,10 +636,21 @@
             const thumbnailWidth = document.getElementById('thumbnailWidth').value;
 
             const elements = files.map((fileName) => {
+                const mediaInfo = MEDIA_DATA[fileName];
                 const gridItem = document.createElement('div');
                 gridItem.classList.add('grid-item');
                 gridItem.style.width = `${thumbnailWidth}px`;
                 gridItem.appendChild(createMediaElement(fileName));
+                
+                // Add info overlay
+                const infoDiv = document.createElement('div');
+                infoDiv.className = 'item-info';
+                infoDiv.innerHTML = `
+                    <div class="item-name" title="${mediaInfo.name}">${mediaInfo.name}</div>
+                    <div class="item-type">${getFileExtension(mediaInfo.name)} • ${mediaInfo.isVideo ? 'Video' : 'Image'}</div>
+                `;
+                gridItem.appendChild(infoDiv);
+                
                 gridItem.addEventListener('click', () => openFullscreen(fileName));
                 return gridItem;
             });
@@ -513,11 +663,13 @@
             } else {
                 imagesLoaded(elements, () => {
                     if(!masonry){
-			initializeMasonry();
-                    setTimeout(() => masonry && masonry.layout(), 50);
+			            initializeMasonry();
+                        setTimeout(() => masonry && masonry.layout(), 50);
              		}
-		});
+		        });
             }
+            
+            updateFileCounter();
         }
 
         function loadMoreMedia() {
@@ -537,7 +689,8 @@
             
             viewedFiles.add(fileName);
             
-            const isVideo = fileName.toLowerCase().match(/\.(mp4|webm|ogg|mov|avi)$/);
+            const mediaInfo = MEDIA_DATA[fileName];
+            const isVideo = mediaInfo.isVideo;
             content.innerHTML = '';
 
             let mediaElement;
@@ -550,18 +703,24 @@
                 mediaElement = document.createElement('img');
             }
 
-            mediaElement.src = MEDIA_DATA[fileName];
+            mediaElement.src = mediaInfo.url;
             content.appendChild(mediaElement);
 
-            updateNavigationState();
+            updateFullscreenInfo(fileName);
             overlay.classList.add('visible');
             resetControlsTimer();
         }
 
-        function updateNavigationState() {
+        function updateFullscreenInfo(fileName) {
+            const mediaInfo = MEDIA_DATA[fileName];
+            const infoDiv = document.getElementById('mediaInfo');
+            
+            infoDiv.querySelector('.media-counter').textContent = `${currentMediaIndex + 1} / ${allMediaFiles.length}`;
+            infoDiv.querySelector('.media-filename').textContent = mediaInfo.name;
+            infoDiv.querySelector('.media-filetype').textContent = `${getFileExtension(mediaInfo.name)} • ${mediaInfo.isVideo ? 'Video' : 'Image'}`;
+            
             document.getElementById('prevBtn').disabled = currentMediaIndex <= 0;
             document.getElementById('nextBtn').disabled = currentMediaIndex >= allMediaFiles.length - 1;
-            document.getElementById('mediaInfo').textContent = `${currentMediaIndex + 1} / ${allMediaFiles.length}`;
         }
 
         function navigateFullscreen(direction) {

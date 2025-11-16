@@ -1,11 +1,11 @@
 #include <windows.h>
 
-// Add this line:
+// Uncomment this line if you have a gallery_icon.ico file:
 101 ICON "gallery_icon.ico"
 
-// Keep existing resources:
-
+// Embed the server binary
 1 RCDATA "../server/server.exe"
+
 // Version info
 1 VERSIONINFO
  FILEVERSION     1,0,0,0

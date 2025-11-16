@@ -1,4 +1,141 @@
-  PROCESS_INFORMATION pi;
+#include <windows.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <shlwapi.h>
+#include <shellapi.h>
+#include <shlobj.h>
+#include <time.h>
+
+// Definitions
+#define MAX_RETRIES 3
+#define RETRY_DELAY 500
+#define SERVER_EXE_RESOURCE 1
+#define BUFFER_SIZE 4096
+
+// Tray Icon definitions
+#define WM_TRAY_ICON (WM_USER + 1)
+#define IDI_TRAY_ICON 101
+#define ID_TRAY_EXIT 1001
+#define ID_TRAY_CHANGE_FOLDER 1002
+#define ID_TRAY_OPEN_BROWSER 1003
+
+const char CLASS_NAME[] = "MediaGalleryLauncherWindow";
+
+// Global Handles
+PROCESS_INFORMATION serverProcessInfo;
+HANDLE hServerProcess = NULL;
+char serverExePath[MAX_PATH];
+char tempExePath[MAX_PATH];
+char currentMediaDir[MAX_PATH];
+char currentPort[10] = "8987";
+HWND hMainWindow = NULL;
+NOTIFYICONDATA nid = {0};
+
+// Forward declarations
+void LaunchBrowser(const char* url);
+void TerminateServerProcess(HANDLE hProcess, DWORD processId);
+void CleanupWithRetries(const char* serverPath, const char* tempPath);
+BOOL ExtractServerBinary(char* outputPath);
+void GetCurrentDir(char* buffer, size_t size);
+BOOL StartServer(const char* mediaDir, const char* port);
+void UpdateTrayTooltip(const char* dir);
+
+BOOL ExtractServerBinary(char* outputPath) {
+    HRSRC hResInfo = FindResource(NULL, MAKEINTRESOURCE(SERVER_EXE_RESOURCE), RT_RCDATA);
+    if (!hResInfo) return FALSE;
+    HGLOBAL hResData = LoadResource(NULL, hResInfo);
+    if (!hResData) return FALSE;
+    DWORD size = SizeofResource(NULL, hResInfo);
+    void* data = LockResource(hResData);
+    if (!data) return FALSE;
+
+    for (int i = 0; i < MAX_RETRIES; i++) {
+        if (!PathFileExists(outputPath)) break;
+        DeleteFile(outputPath);
+        if (!PathFileExists(outputPath)) break;
+        Sleep(RETRY_DELAY);
+    }
+
+    char uniquePath[MAX_PATH];
+    if (PathFileExists(outputPath)) {
+        snprintf(uniquePath, sizeof(uniquePath), "%s.%d.exe", outputPath, (int)time(NULL));
+        strcpy(outputPath, uniquePath);
+    }
+
+    HANDLE hFile = CreateFile(outputPath, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 
+                              FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hFile == INVALID_HANDLE_VALUE) return FALSE;
+    
+    DWORD written;
+    BOOL result = WriteFile(hFile, data, size, &written, NULL);
+    CloseHandle(hFile);
+    return result && (written == size);
+}
+
+void GetCurrentDir(char* buffer, size_t size) {
+    GetModuleFileName(NULL, buffer, size);
+    PathRemoveFileSpec(buffer);
+}
+
+void LaunchBrowser(const char* url) {
+    Sleep(2000);
+    char cmd[BUFFER_SIZE];
+    snprintf(cmd, sizeof(cmd), 
+        "\"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe\" --ignore-certificate-errors \"%s\"", url);
+    
+    STARTUPINFO si = {sizeof(si)};
+    PROCESS_INFORMATION pi;
+    
+    if (!CreateProcess(NULL, cmd, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
+        snprintf(cmd, sizeof(cmd), 
+            "\"C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe\" --ignore-certificate-errors \"%s\"", url);
+        
+        if (!CreateProcess(NULL, cmd, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
+            ShellExecute(NULL, "open", url, NULL, NULL, SW_SHOWNORMAL);
+            return;
+        }
+    }
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+}
+
+void TerminateServerProcess(HANDLE hProcess, DWORD processId) {
+    if (hProcess && hProcess != INVALID_HANDLE_VALUE) {
+        DWORD exitCode;
+        if (GetExitCodeProcess(hProcess, &exitCode) && exitCode == STILL_ACTIVE) {
+            GenerateConsoleCtrlEvent(CTRL_C_EVENT, processId);
+            if (WaitForSingleObject(hProcess, 3000) == WAIT_TIMEOUT) {
+                TerminateProcess(hProcess, 0);
+                WaitForSingleObject(hProcess, 1000);
+            }
+        }
+    }
+}
+
+void CleanupWithRetries(const char* serverPath, const char* tempPath) {
+    for (int i = 0; i < MAX_RETRIES; i++) {
+        if (!PathFileExists(serverPath)) break;
+        SetFileAttributes(serverPath, FILE_ATTRIBUTE_NORMAL);
+        if (DeleteFile(serverPath)) break;
+        Sleep(RETRY_DELAY);
+    }
+    for (int i = 0; i < MAX_RETRIES; i++) {
+        if (!PathFileExists(tempPath)) break;
+        if (RemoveDirectory(tempPath)) break;
+        Sleep(RETRY_DELAY);
+    }
+}
+
+BOOL StartServer(const char* mediaDir, const char* port) {
+    if (hServerProcess) {
+        TerminateServerProcess(hServerProcess, serverProcessInfo.dwProcessId);
+        CloseHandle(hServerProcess);
+        CloseHandle(serverProcessInfo.hThread);
+        hServerProcess = NULL;
+    }
+
+    STARTUPINFO si = {sizeof(si)};
+    PROCESS_INFORMATION pi;
     si.dwFlags = STARTF_USESHOWWINDOW;
     si.wShowWindow = SW_HIDE;
     
@@ -24,7 +161,6 @@ void UpdateTrayTooltip(const char* dir) {
     char tooltip[256];
     char shortDir[64];
     
-    // Get just the folder name
     const char* lastSlash = strrchr(dir, '\\');
     if (lastSlash) {
         strncpy(shortDir, lastSlash + 1, sizeof(shortDir) - 1);
@@ -38,10 +174,8 @@ void UpdateTrayTooltip(const char* dir) {
     Shell_NotifyIcon(NIM_MODIFY, &nid);
 }
 
-// Callback for SHBrowseForFolder to set initial directory
 int CALLBACK BrowseCallbackProc(HWND hwnd, UINT uMsg, LPARAM lParam, LPARAM lpData) {
     if (uMsg == BFFM_INITIALIZED) {
-        // Set the initial directory to the current media directory
         SendMessage(hwnd, BFFM_SETSELECTION, TRUE, lpData);
     }
     return 0;
@@ -55,16 +189,14 @@ void ChangeFolderAndRestart() {
     bi.lpszTitle = "Select Media Folder";
     bi.ulFlags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE | BIF_USENEWUI;
     bi.lpfn = BrowseCallbackProc;
-    bi.lParam = (LPARAM)currentMediaDir; // Pass current directory
+    bi.lParam = (LPARAM)currentMediaDir;
     
     LPITEMIDLIST pidl = SHBrowseForFolder(&bi);
     if (pidl) {
         if (SHGetPathFromIDList(pidl, newFolder)) {
-            // Restart server with new folder
             if (StartServer(newFolder, currentPort)) {
                 UpdateTrayTooltip(newFolder);
                 
-                // Open browser to new location
                 char url[BUFFER_SIZE];
                 snprintf(url, sizeof(url), "https://localhost:%s", currentPort);
                 LaunchBrowser(url);
@@ -92,7 +224,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 PostMessage(hwnd, WM_NULL, 0, 0);
                 DestroyMenu(hMenu);
             } else if (lParam == WM_LBUTTONDBLCLK) {
-                // Double-click opens browser
                 char url[BUFFER_SIZE];
                 snprintf(url, sizeof(url), "https://localhost:%s", currentPort);
                 LaunchBrowser(url);
@@ -152,22 +283,18 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     
     CoInitialize(NULL);
     
-    // Get current directory
     GetCurrentDir(currentDir, sizeof(currentDir));
     
-    // Create unique temp directory
     GetTempPath(sizeof(tempExePath), tempExePath);
     snprintf(tempExePath + strlen(tempExePath), sizeof(tempExePath) - strlen(tempExePath), 
              "MediaGallery_%d\\", GetCurrentProcessId());
     CreateDirectory(tempExePath, NULL);
 
-    // Get port from command line if provided
     if (lpCmdLine && strlen(lpCmdLine) > 0) {
        strncpy(currentPort, lpCmdLine, sizeof(currentPort) - 1);
        currentPort[sizeof(currentPort) - 1] = '\0';
     }
     
-    // Extract server binary
     snprintf(serverExePath, sizeof(serverExePath), "%sserver.exe", tempExePath);
     if (!ExtractServerBinary(serverExePath)) {
          char errMsg[512];
@@ -179,53 +306,35 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         return 1;
     }
 
-    // Create the host window
     hMainWindow = CreateHostWindow(hInstance);
     if (hMainWindow == NULL) {
         MessageBox(NULL, "Failed to create host window", "Error", MB_ICONERROR);
         return 1;
     }
     
-    // Start server (with nobrowser flag)
     if (!StartServer(currentDir, currentPort)) {
         DestroyWindow(hMainWindow);
         return 1;
     }
     
-    // Launch browser ONLY from launcher
     char url[BUFFER_SIZE];
     snprintf(url, sizeof(url), "https://localhost:%s", currentPort);
     LaunchBrowser(url);
     
-    // Create system tray icon
     nid.cbSize = sizeof(nid);
     nid.hWnd = hMainWindow;
     nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
     nid.uCallbackMessage = WM_TRAY_ICON;
-    
-    // Try to load custom icon, fallback to default
-    HICON hIcon = (HICON)LoadImage(hInstance, MAKEINTRESOURCE(IDI_TRAY_ICON), 
-                                    IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR | LR_DEFAULTSIZE);
-    if (hIcon == NULL) {
-        // Fallback to built-in Windows icon if custom icon fails
-        hIcon = LoadIcon(NULL, IDI_APPLICATION);
-    }
-    nid.hIcon = hIcon;
-    
+    nid.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_TRAY_ICON));
     UpdateTrayTooltip(currentDir);
     Shell_NotifyIcon(NIM_ADD, &nid);
     
-    // Run message loop
     MSG msg = {0};
     while (GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
     
-    // Cleanup
-    if (nid.hIcon && nid.hIcon != LoadIcon(NULL, IDI_APPLICATION)) {
-        DestroyIcon(nid.hIcon);
-    }
     CloseHandle(hServerProcess);
     CloseHandle(serverProcessInfo.hThread);
     Sleep(1000);
