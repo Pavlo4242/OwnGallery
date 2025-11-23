@@ -57,6 +57,14 @@
             display: flex;
             align-items: center;
             gap: 8px;
+            max-width: 300px;
+            overflow: hidden;
+        }
+        
+        .current-folder-path {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .file-counter {
@@ -257,8 +265,7 @@
 		.media-info {
 			position: absolute;
 			bottom: 30px;
-			left: 30px; /* Changed from 50% */
-			/* transform: translateX(-50%); */ /* Removed this line */
+			left: 30px;
 			color: white;
 			background-color: rgba(0, 0, 0, 0.8);
 			padding: 12px 24px;
@@ -268,9 +275,8 @@
 			backdrop-filter: blur(10px);
 			display: flex;
 			flex-direction: column;
-			/* align-items: center; */ /* Removed this line */
 			gap: 4px;
-			max-width: 400px; /* Changed from 80% */
+			max-width: 400px;
 		}
 
         .media-counter {
@@ -376,10 +382,11 @@
 <body>
     <div class="controls">
         <div class="controls-left">
-            <div class="current-folder" id="currentFolder">
+            <div class="current-folder" id="currentFolder" title="The folder being served">
                 <span>📁</span>
-                <span id="folderName">Loading...</span>
+                <span id="folderName" class="current-folder-path">Loading Root Path...</span>
             </div>
+            <button onclick="openExplorer()">📂 Open Folder in Explorer</button>
             <div class="file-counter" id="fileCounter">0 files</div>
         </div>
         
@@ -399,7 +406,7 @@
         </div>
         
         <div class="controls-right">
-            <!-- Placeholder for future buttons -->
+            <!-- Place for future controls -->
         </div>
     </div>
 
@@ -423,7 +430,7 @@
             <button id="playPauseBtn">▶ Play</button>
             <div style="text-align: center;">
                 <label style="color: white; font-size: 11px;">Speed (ms)</label>
-                <input type="number" id="advanceTime" min="500" max="30000" step="100" value="3000" 
+                <input type="number" id="advanceTime" min="500" max="30000" step="100" value="500" 
                        style="width: 100px; padding: 8px; border-radius: 8px; border: none; text-align: center; margin-top: 5px;">
             </div>
             <button onclick="scrollToTop()">↑ Back to Top</button>
@@ -445,7 +452,7 @@
         let isPlaying = false;
         let viewedFiles = new Set();
         let controlsHideTimer = null;
-        let currentFolderPath = '';
+        let currentRootPath = 'Loading...'; // Stores the absolute root path
 
         function updateFileCounter() {
             const total = allMediaFiles.length;
@@ -455,75 +462,100 @@
             document.getElementById('totalCount').textContent = total;
         }
 
-        function updateCurrentFolder() {
-            // Extract folder name from path
-            const parts = currentFolderPath.split(/[/\\]/);
-            const folderName = parts[parts.length - 1] || parts[parts.length - 2] || 'Root';
-            document.getElementById('folderName').textContent = folderName;
+        async function updateRootPathDisplay() {
+            try {
+                const response = await fetch('/api/root_dir');
+                if (response.ok) {
+                    const data = await response.json();
+                    currentRootPath = data.root_dir;
+                    document.getElementById('folderName').textContent = currentRootPath;
+                    document.getElementById('currentFolder').title = 'Current Root: ' + currentRootPath;
+                } else {
+                    document.getElementById('folderName').textContent = 'Root Path Error';
+                }
+            } catch (e) {
+                console.error("Failed to fetch root directory:", e);
+                document.getElementById('folderName').textContent = 'API Error';
+            }
         }
+        
+        async function openExplorer() {
+            // This calls the Go server API, which executes the system command
+            try {
+                const response = await fetch('/api/open_explorer');
+                if (!response.ok) {
+                    console.error('Failed to open explorer via API:', response.statusText);
+                    // Inform the user what the desktop tool can do, as a fallback
+                    alert('Failed to open folder. Please use the system tray icon to "Change Folder..." or manually open the directory shown in the control bar.');
+                }
+            } catch (e) {
+                console.error("Error calling open_explorer API:", e);
+                alert('Connection error. Please use the system tray icon to "Change Folder..." or manually open the directory shown in the control bar.');
+            }
+        }
+
 
         async function initializeGallery() {
             const grid = document.querySelector('.grid');
             grid.innerHTML = '<div class="loading">Loading media files</div>';
             
-            try {
-        const response = await fetch('/api/files');
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: Could not load file list from /api/files`);
-        }
-        
-        // The response now contains 'files' and 'directories'
-        const apiData = await response.json();
-        const fileList = apiData.files || [];
-        const directoryList = apiData.directories || [];
-
-        if (fileList.length === 0 && directoryList.length === 0) {
-            grid.innerHTML = '<div class="loading">No media files or folders found</div>';
-            return;
-        }
-        
-        FOLDER_MAP = { 'all': [] };
-        MEDIA_DATA = {};
-        
-        // Process all directories first to ensure they appear in the filter
-        directoryList.forEach(folderName => {
-            if (!FOLDER_MAP[folderName]) {
-                FOLDER_MAP[folderName] = [];
-            }
-        });
-        
-        // Then, process all files
-        fileList.forEach((fileInfo) => {
-            const relativePath = fileInfo.path;
-            const webUrl = '/media/' + relativePath;
-            MEDIA_DATA[relativePath] = {
-                url: webUrl,
-                name: fileInfo.name,
-                isVideo: fileInfo.isVideo
-            };
-            FOLDER_MAP['all'].push(relativePath);
+            // 1. Get and display the root path first
+            await updateRootPathDisplay();
             
-            const parts = relativePath.split('/');
-            if (parts.length > 1) {
-                const folderName = parts.slice(0, -1).join('/');
-                // Folder should already exist from the directoryList pass, but check just in case
-                if (!FOLDER_MAP[folderName]) {
-                    FOLDER_MAP[folderName] = [];
+            try {
+                const response = await fetch('/api/files');
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: Could not load file list from /api/files`);
                 }
-                FOLDER_MAP[folderName].push(relativePath);
+                
+                const apiData = await response.json();
+                const fileList = apiData.files || [];
+                const directoryList = apiData.directories || [];
+
+                if (fileList.length === 0 && directoryList.length === 0) {
+                    grid.innerHTML = '<div class="loading">No media files or folders found</div>';
+                    return;
+                }
+                
+                FOLDER_MAP = { 'all': [] };
+                MEDIA_DATA = {};
+                
+                // Process all directories first
+                directoryList.forEach(folderName => {
+                    if (!FOLDER_MAP[folderName]) {
+                        FOLDER_MAP[folderName] = [];
+                    }
+                });
+                
+                // Then, process all files
+                fileList.forEach((fileInfo) => {
+                    const relativePath = fileInfo.path;
+                    const webUrl = '/media/' + relativePath;
+                    MEDIA_DATA[relativePath] = {
+                        url: webUrl,
+                        name: fileInfo.name,
+                        isVideo: fileInfo.isVideo
+                    };
+                    FOLDER_MAP['all'].push(relativePath);
+                    
+                    const parts = relativePath.split('/');
+                    if (parts.length > 1) {
+                        const folderName = parts.slice(0, -1).join('/');
+                        if (!FOLDER_MAP[folderName]) {
+                            FOLDER_MAP[folderName] = [];
+                        }
+                        FOLDER_MAP[folderName].push(relativePath);
+                    }
+                });
+                
+                populateFolderFilter();
+                filterGalleryByFolder();
+                
+            } catch (error) {
+                console.error('Error:', error);
+                grid.innerHTML = `<div class="loading">Error: ${error.message}</div>`;
             }
-        });
-        
-        currentFolderPath = 'Root';
-        updateCurrentFolder();
-        populateFolderFilter();
-        filterGalleryByFolder();
-        
-    } catch (error) {
-        console.error('Error:', error);
-        grid.innerHTML = `<div class="loading">Error: ${error.message}</div>`;
-    }
-}
+        }
 
         function populateFolderFilter() {
             const select = document.getElementById('folderFilter');
@@ -544,9 +576,6 @@
             const folderName = select.value;
             const grid = document.querySelector('.grid');
             const shuffleEnabled = document.getElementById('shuffleToggle').checked;
-            
-            currentFolderPath = folderName === 'all' ? 'Root' : folderName;
-            updateCurrentFolder();
             
             if (masonry) {
                 masonry.destroy();
@@ -731,7 +760,8 @@
             infoDiv.querySelector('.media-filetype').textContent = `${getFileExtension(mediaInfo.name)} • ${mediaInfo.isVideo ? 'Video' : 'Image'}`;
             
             document.getElementById('prevBtn').disabled = currentMediaIndex <= 0;
-            document.getElementById('nextBtn').disabled = currentMediaIndex >= allMediaFiles.length - 1;
+            document.getElementById('nextBtn').disabled = currentMediaFiles.length - 1 <= 0 || currentMediaIndex >= allMediaFiles.length - 1;
+
         }
 
         function navigateFullscreen(direction) {
@@ -761,7 +791,13 @@
 
         function startAutoAdvance() {
             stopAutoAdvance();
-            const delay = parseInt(document.getElementById('advanceTime').value) || 3000;
+            // Set default time to 500ms as requested
+            let delay = parseInt(document.getElementById('advanceTime').value);
+            if (isNaN(delay) || delay < 500) {
+                delay = 500;
+                document.getElementById('advanceTime').value = 500;
+            }
+
             autoAdvanceInterval = setInterval(() => {
                 if (currentMediaIndex < allMediaFiles.length - 1) {
                     navigateFullscreen(1);
