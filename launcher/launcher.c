@@ -7,7 +7,7 @@
 #include <time.h>
 
 // Definitions
-#define MAX_RETRIES 3
+#define MAX_RETRIES 5 // Increased from 3 for better cleanup tolerance
 #define RETRY_DELAY 500
 #define SERVER_EXE_RESOURCE 1
 #define BUFFER_SIZE 4096
@@ -18,6 +18,7 @@
 #define ID_TRAY_EXIT 1001
 #define ID_TRAY_CHANGE_FOLDER 1002
 #define ID_TRAY_OPEN_BROWSER 1003
+#define ID_TRAY_CHANGE_PORT 1004
 
 const char CLASS_NAME[] = "MediaGalleryLauncherWindow";
 
@@ -40,6 +41,9 @@ BOOL ExtractServerBinary(char* outputPath);
 void GetCurrentDir(char* buffer, size_t size);
 BOOL StartServer(const char* mediaDir, const char* port);
 void UpdateTrayTooltip(const char* dir);
+int CALLBACK BrowseCallbackProc(HWND hwnd, UINT uMsg, LPARAM lParam, LPARAM lpData);
+void ChangeFolderAndRestart();
+void ChangePortAndRestart();
 
 BOOL ExtractServerBinary(char* outputPath) {
     HRSRC hResInfo = FindResource(NULL, MAKEINTRESOURCE(SERVER_EXE_RESOURCE), RT_RCDATA);
@@ -104,8 +108,10 @@ void TerminateServerProcess(HANDLE hProcess, DWORD processId) {
     if (hProcess && hProcess != INVALID_HANDLE_VALUE) {
         DWORD exitCode;
         if (GetExitCodeProcess(hProcess, &exitCode) && exitCode == STILL_ACTIVE) {
+            // Try graceful termination first (sends Ctrl+C event)
             GenerateConsoleCtrlEvent(CTRL_C_EVENT, processId);
             if (WaitForSingleObject(hProcess, 3000) == WAIT_TIMEOUT) {
+                // Force terminate if graceful fails
                 TerminateProcess(hProcess, 0);
                 WaitForSingleObject(hProcess, 1000);
             }
@@ -137,29 +143,24 @@ BOOL StartServer(const char* mediaDir, const char* port) {
 
     STARTUPINFO si = {sizeof(si)};
     PROCESS_INFORMATION pi;
-    DWORD creationFlags; // We will set this based on our flag
+    DWORD creationFlags; 
 
-    // --- Conditional logic for showing/hiding the console ---
     if (showConsole) {
-        // To SHOW the console, we use the default system settings.
-        // A console application will create a console by default.
-        creationFlags = 0; // No special creation flags
+        creationFlags = 0;
         si.dwFlags = 0;
         si.wShowWindow = SW_SHOW;
     } else {
-        // To HIDE the console, we use the original logic.
         creationFlags = CREATE_NO_WINDOW;
         si.dwFlags = STARTF_USESHOWWINDOW;
         si.wShowWindow = SW_HIDE;
     }
-    // --- End of conditional logic ---
     
     char cmdLine[BUFFER_SIZE];
     snprintf(cmdLine, sizeof(cmdLine), "\"%s\" \"%s\" %s nobrowser", 
              serverExePath, mediaDir, port);
     
     if (!CreateProcess(NULL, cmdLine, NULL, NULL, FALSE, 
-                      creationFlags, NULL, NULL, &si, &pi)) { // Pass the conditional creationFlags
+                      creationFlags, NULL, NULL, &si, &pi)) { 
         MessageBox(NULL, "Failed to start server", "Error", MB_ICONERROR);
         return FALSE;
     }
@@ -184,7 +185,8 @@ void UpdateTrayTooltip(const char* dir) {
     }
     shortDir[sizeof(shortDir) - 1] = '\0';
     
-    snprintf(tooltip, sizeof(tooltip), "Media Gallery - %s", shortDir);
+    // Updated tooltip to include the current port
+    snprintf(tooltip, sizeof(tooltip), "Media Gallery - %s (Port: %s)", shortDir, currentPort);
     strcpy(nid.szTip, tooltip);
     Shell_NotifyIcon(NIM_MODIFY, &nid);
 }
@@ -221,6 +223,42 @@ void ChangeFolderAndRestart() {
     }
 }
 
+// Handles changing the port by toggling between common ports
+void ChangePortAndRestart() {
+    char newPort[10];
+    const char* suggestedPort;
+    
+    // Toggle between 8987 (default) and 8443 (a common HTTPS default)
+    if (strcmp(currentPort, "8987") == 0) {
+        suggestedPort = "8443";
+    } else {
+        suggestedPort = "8987";
+    }
+    
+    // Prepare message
+    char msg[256];
+    snprintf(msg, sizeof(msg), 
+             "Current port is %s. Do you want to change it to %s and restart the server?\n\n"
+             "Note: For custom ports, you must relaunch the executable with the port as a command line argument.", 
+             currentPort, suggestedPort);
+
+    // Prompt user for confirmation
+    if (MessageBox(hMainWindow, msg, "Change Server Port", MB_YESNO | MB_ICONQUESTION) == IDYES) {
+        strcpy(newPort, suggestedPort);
+        
+        if (StartServer(currentMediaDir, newPort)) {
+            UpdateTrayTooltip(currentMediaDir);
+            
+            char url[BUFFER_SIZE];
+            snprintf(url, sizeof(url), "https://localhost:%s", newPort);
+            LaunchBrowser(url);
+        } else {
+            MessageBox(hMainWindow, "Failed to restart server on new port.", "Error", MB_ICONERROR);
+        }
+    }
+}
+
+
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
         case WM_TRAY_ICON:
@@ -230,6 +268,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 HMENU hMenu = CreatePopupMenu();
                 
                 AppendMenu(hMenu, MF_STRING, ID_TRAY_CHANGE_FOLDER, "Change Folder...");
+                AppendMenu(hMenu, MF_STRING, ID_TRAY_CHANGE_PORT, "Change Port...");
                 AppendMenu(hMenu, MF_STRING, ID_TRAY_OPEN_BROWSER, "Open in Browser");
                 AppendMenu(hMenu, MF_SEPARATOR, 0, NULL);
                 AppendMenu(hMenu, MF_STRING, ID_TRAY_EXIT, "Exit");
@@ -250,6 +289,9 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 case ID_TRAY_CHANGE_FOLDER:
                     ChangeFolderAndRestart();
                     break;
+                case ID_TRAY_CHANGE_PORT:
+                    ChangePortAndRestart();
+                    break;
                 case ID_TRAY_OPEN_BROWSER: {
                     char url[BUFFER_SIZE];
                     snprintf(url, sizeof(url), "https://localhost:%s", currentPort);
@@ -268,7 +310,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             
         case WM_DESTROY:
             Shell_NotifyIcon(NIM_DELETE, &nid);
-            TerminateServerProcess(hServerProcess, serverProcessInfo.dwProcessId);
+            // This ensures the Go process is terminated before the launcher exits
+            TerminateServerProcess(hServerProcess, serverProcessInfo.dwProcessId); 
             PostQuitMessage(0);
             break;
             
@@ -362,7 +405,7 @@ GetCurrentDir(currentDir, sizeof(currentDir));
     
     CloseHandle(hServerProcess);
     CloseHandle(serverProcessInfo.hThread);
-    Sleep(1000);
+    Sleep(2000); // Increased from 1000ms for better OS resource cleanup
     CleanupWithRetries(serverExePath, tempExePath);
     
     CoUninitialize();
