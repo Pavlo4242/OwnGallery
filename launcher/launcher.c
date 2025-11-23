@@ -75,8 +75,11 @@ BOOL ExtractServerBinary(char* outputPath) {
 }
 
 void GetCurrentDir(char* buffer, size_t size) {
-    GetModuleFileName(NULL, buffer, size);
-    PathRemoveFileSpec(buffer);
+    if (!GetCurrentDirectory(size, buffer)) {
+        // Fallback to exe location if CWD fails
+        GetModuleFileName(NULL, buffer, size);
+        PathRemoveFileSpec(buffer);
+    }
 }
 
 void LaunchBrowser(const char* url) {
