@@ -1,6 +1,6 @@
 name: Build Media Gallery Launcher
 
-on:
+n:
   push:
     branches: [ main, develop ]
     tags:
