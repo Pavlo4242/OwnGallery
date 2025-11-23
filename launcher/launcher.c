@@ -15,6 +15,7 @@
 // Tray Icon definitions
 #define WM_TRAY_ICON (WM_USER + 1)
 #define IDI_TRAY_ICON 101
+#define ID_TRAY_HELP 1004
 #define ID_TRAY_EXIT 1001
 #define ID_TRAY_CHANGE_FOLDER 1002
 #define ID_TRAY_OPEN_BROWSER 1003
@@ -172,6 +173,44 @@ BOOL StartServer(const char* mediaDir, const char* port) {
     return TRUE;
 }
 
+void ShowHelp() {
+    const char* helpText = 
+        "\n"
+        "═══════════════════════════════════════════════════════\n"
+        "           Media Gallery Launcher - Help\n"
+        "═══════════════════════════════════════════════════════\n\n"
+        "USAGE: MediaGallery.exe [OPTIONS] [DIRECTORY] [PORT]\n\n"
+        "OPTIONS:\n"
+        "  /help, -help, /?     Show this help message\n"
+        "  /w, -w               Show console window (debug mode)\n"
+        "  /d <path>            Specify media directory\n"
+        "  /p <port>            Specify port (default: 8987)\n\n"
+        "EXAMPLES:\n"
+        "  MediaGallery.exe\n"
+        "  MediaGallery.exe /w\n"
+        "  MediaGallery.exe \"C:\\Photos\"\n"
+        "  MediaGallery.exe /d \"D:\\Videos\" /p 9000\n"
+        "  MediaGallery.exe /w \"C:\\Media\" 8080\n\n"
+        "TRAY ICON:\n"
+        "  Double-click:  Open in browser\n"
+        "  Right-click:   Menu (change folder, exit)\n\n"
+        "═══════════════════════════════════════════════════════\n\n";
+    
+    // Try to allocate console if not already present
+    if (AllocConsole() || GetConsoleWindow() != NULL) {
+        // Console mode - print to stdout
+        HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+        DWORD written;
+        WriteConsole(hConsole, helpText, strlen(helpText), &written, NULL);
+        
+        printf("Press any key to exit...\n");
+        getchar();
+    } else {
+        // GUI mode - show message box
+        MessageBox(NULL, helpText, "Media Gallery - Help", MB_ICONINFORMATION | MB_OK);
+    }
+}
+
 void UpdateTrayTooltip(const char* dir) {
     char tooltip[256];
     char shortDir[64];
@@ -232,6 +271,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 AppendMenu(hMenu, MF_STRING, ID_TRAY_CHANGE_FOLDER, "Change Folder...");
                 AppendMenu(hMenu, MF_STRING, ID_TRAY_OPEN_BROWSER, "Open in Browser");
                 AppendMenu(hMenu, MF_SEPARATOR, 0, NULL);
+                AppendMenu(hMenu, MF_STRING, ID_TRAY_HELP, "Help");
                 AppendMenu(hMenu, MF_STRING, ID_TRAY_EXIT, "Exit");
                 
                 SetForegroundWindow(hwnd);
@@ -256,6 +296,9 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                     LaunchBrowser(url);
                     break;
                 }
+                case ID_TRAY_HELP:
+                    ShowHelp();
+                    break;
                 case ID_TRAY_EXIT:
                     PostMessage(hwnd, WM_CLOSE, 0, 0);
                     break;
@@ -295,25 +338,85 @@ HWND CreateHostWindow(HINSTANCE hInstance) {
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
     char currentDir[MAX_PATH];
+    char specifiedDir[MAX_PATH] = {0};
     
     CoInitialize(NULL);
     
-    // --- New, more robust argument parsing ---
+    // --- Enhanced argument parsing with help and directory support ---
     int argc;
     LPWSTR *argv = CommandLineToArgvW(GetCommandLineW(), &argc);
     if (argv) {
-        for (int i = 1; i < argc; i++) { // Start at 1 to skip the program name
+        // First pass: check for help flag
+        for (int i = 1; i < argc; i++) {
+            if (wcscmp(argv[i], L"/help") == 0 || 
+                wcscmp(argv[i], L"-help") == 0 ||
+                wcscmp(argv[i], L"--help") == 0 ||
+                wcscmp(argv[i], L"/?") == 0 ||
+                wcscmp(argv[i], L"-?") == 0) {
+                ShowHelp();
+                LocalFree(argv);
+                CoUninitialize();
+                return 0;
+            }
+        }
+        
+        // Second pass: parse other arguments
+        for (int i = 1; i < argc; i++) {
             if (wcscmp(argv[i], L"/w") == 0 || wcscmp(argv[i], L"-w") == 0) {
-                showConsole = TRUE; // Set our flag if /w is found
+                showConsole = TRUE;
+            } else if (wcscmp(argv[i], L"/p") == 0 || wcscmp(argv[i], L"-p") == 0) {
+                if (i + 1 < argc) {
+                    i++;
+                    WideCharToMultiByte(CP_ACP, 0, argv[i], -1, currentPort, sizeof(currentPort), NULL, NULL);
+                }
+            } else if (wcscmp(argv[i], L"/d") == 0 || wcscmp(argv[i], L"-d") == 0) {
+                if (i + 1 < argc) {
+                    i++;
+                    WideCharToMultiByte(CP_UTF8, 0, argv[i], -1, specifiedDir, sizeof(specifiedDir), NULL, NULL);
+                }
             } else {
-                // Assume any other argument is the port number
-                // Convert wide-char string to multi-byte string for our port variable
-                WideCharToMultiByte(CP_ACP, 0, argv[i], -1, currentPort, sizeof(currentPort), NULL, NULL);
+                // Implicit argument parsing
+                char arg[MAX_PATH];
+                WideCharToMultiByte(CP_UTF8, 0, argv[i], -1, arg, sizeof(arg), NULL, NULL);
+                
+                if (strchr(arg, '\\') || strchr(arg, '/') || strchr(arg, ':')) {
+                    strncpy(specifiedDir, arg, sizeof(specifiedDir) - 1);
+                } else {
+                    BOOL isNumeric = TRUE;
+                    for (int j = 0; arg[j] != '\0'; j++) {
+                        if (!isdigit(arg[j])) {
+                            isNumeric = FALSE;
+                            break;
+                        }
+                    }
+                    if (isNumeric) {
+                        strncpy(currentPort, arg, sizeof(currentPort) - 1);
+                    }
+                }
             }
         }
         LocalFree(argv);
     }
-GetCurrentDir(currentDir, sizeof(currentDir));
+    
+    // Determine which directory to use
+    if (specifiedDir[0] != '\0') {
+        if (PathFileExists(specifiedDir) && PathIsDirectory(specifiedDir)) {
+            strncpy(currentDir, specifiedDir, sizeof(currentDir) - 1);
+            currentDir[sizeof(currentDir) - 1] = '\0';
+        } else {
+            char errMsg[512];
+            snprintf(errMsg, sizeof(errMsg), 
+                     "Specified directory does not exist or is invalid:\n%s\n\n"
+                     "Please provide a valid directory path.\n\n"
+                     "Run with /help for usage information.",
+                     specifiedDir);
+            MessageBox(NULL, errMsg, "Invalid Directory", MB_ICONERROR | MB_OK);
+            CoUninitialize();
+            return 1;
+        }
+    } else {
+        GetCurrentDir(currentDir, sizeof(currentDir));
+    }
     
     GetTempPath(sizeof(tempExePath), tempExePath);
     snprintf(tempExePath + strlen(tempExePath), sizeof(tempExePath) - strlen(tempExePath), 
