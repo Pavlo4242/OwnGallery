@@ -138,6 +138,28 @@
             pointer-events: none;
         }
 
+        /* Folder Card Styles */
+        .folder-card {
+            background: #2d2d2d;
+            border: 1px solid #3a3a3a;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: #fff;
+            font-size: 14px;
+            height: 150px; /* Fixed height for folder cards */
+        }
+        .folder-card:hover {
+            border-color: #4CAF50;
+            background: #3a3a3a;
+        }
+        .folder-icon {
+            font-size: 40px;
+            margin-bottom: 10px;
+        }
+
         .item-info {
             position: absolute;
             bottom: 0;
@@ -196,13 +218,14 @@
             box-sizing: border-box;
         }
 
+        /* UPDATED: Scaling for images/videos */
         .fullscreen-content img,
         .fullscreen-content video {
-            max-width: calc(100vw - 40px);
-            max-height: calc(100vh - 40px);
+            width: 100%;
+            height: 100%;
             object-fit: contain;
             border-radius: 8px;
-            pointer-events: none;
+            /* Removed pointer-events: none to allow video interaction */
         }
 
         .nav-btn {
@@ -262,22 +285,22 @@
             transform: rotate(90deg);
         }
 
-		.media-info {
-			position: absolute;
-			bottom: 30px;
-			left: 30px;
-			color: white;
-			background-color: rgba(0, 0, 0, 0.8);
-			padding: 12px 24px;
-			border-radius: 25px;
-			font-size: 14px;
-			z-index: 1002;
-			backdrop-filter: blur(10px);
-			display: flex;
-			flex-direction: column;
-			gap: 4px;
-			max-width: 400px;
-		}
+        .media-info {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            color: white;
+            background-color: rgba(0, 0, 0, 0.8);
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 14px;
+            z-index: 1002;
+            backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            max-width: 400px;
+        }
 
         .media-counter {
             font-size: 16px;
@@ -406,8 +429,7 @@
         </div>
         
         <div class="controls-right">
-            <!-- Place for future controls -->
-        </div>
+            </div>
     </div>
 
     <div class="grid"></div>
@@ -444,6 +466,7 @@
         let allMediaFiles = [];
         let MEDIA_DATA = {};
         let FOLDER_MAP = {};
+        let allDirectories = [];
         let masonry;
         let loadedMediaCount = 0;
         const filesPerLoad = 30;
@@ -452,7 +475,7 @@
         let isPlaying = false;
         let viewedFiles = new Set();
         let controlsHideTimer = null;
-        let currentRootPath = 'Loading...'; // Stores the absolute root path
+        let currentRootPath = 'Loading...';
 
         function updateFileCounter() {
             const total = allMediaFiles.length;
@@ -480,39 +503,35 @@
         }
         
         async function openExplorer() {
-            // This calls the Go server API, which executes the system command
             try {
                 const response = await fetch('/api/open_explorer');
                 if (!response.ok) {
                     console.error('Failed to open explorer via API:', response.statusText);
-                    // Inform the user what the desktop tool can do, as a fallback
-                    alert('Failed to open folder. Please use the system tray icon to "Change Folder..." or manually open the directory shown in the control bar.');
+                    alert('Failed to open folder. Please open manually.');
                 }
             } catch (e) {
                 console.error("Error calling open_explorer API:", e);
-                alert('Connection error. Please use the system tray icon to "Change Folder..." or manually open the directory shown in the control bar.');
+                alert('Connection error.');
             }
         }
-
 
         async function initializeGallery() {
             const grid = document.querySelector('.grid');
             grid.innerHTML = '<div class="loading">Loading media files</div>';
             
-            // 1. Get and display the root path first
             await updateRootPathDisplay();
             
             try {
                 const response = await fetch('/api/files');
                 if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: Could not load file list from /api/files`);
+                    throw new Error(`HTTP ${response.status}: Could not load file list`);
                 }
                 
                 const apiData = await response.json();
                 const fileList = apiData.files || [];
-                const directoryList = apiData.directories || [];
+                allDirectories = apiData.directories || [];
 
-                if (fileList.length === 0 && directoryList.length === 0) {
+                if (fileList.length === 0 && allDirectories.length === 0) {
                     grid.innerHTML = '<div class="loading">No media files or folders found</div>';
                     return;
                 }
@@ -520,17 +539,19 @@
                 FOLDER_MAP = { 'all': [] };
                 MEDIA_DATA = {};
                 
-                // Process all directories first
-                directoryList.forEach(folderName => {
+                // Process directories
+                allDirectories.forEach(folderName => {
                     if (!FOLDER_MAP[folderName]) {
                         FOLDER_MAP[folderName] = [];
                     }
                 });
                 
-                // Then, process all files
+                // Process files
                 fileList.forEach((fileInfo) => {
                     const relativePath = fileInfo.path;
-                    const webUrl = '/media/' + relativePath;
+                    // FIX: URL Encoding for paths with # or special chars
+                    const webUrl = '/media/' + relativePath.split('/').map(encodeURIComponent).join('/');
+                    
                     MEDIA_DATA[relativePath] = {
                         url: webUrl,
                         name: fileInfo.name,
@@ -576,6 +597,7 @@
             const folderName = select.value;
             const grid = document.querySelector('.grid');
             const shuffleEnabled = document.getElementById('shuffleToggle').checked;
+            const thumbnailWidth = document.getElementById('thumbnailWidth').value;
             
             if (masonry) {
                 masonry.destroy();
@@ -584,6 +606,39 @@
 
 			grid.innerHTML = '';
             
+            // --- NEW: Folder Navigation Logic ---
+            // Find immediate subfolders of the current selection
+            const currentPrefix = folderName === 'all' ? '' : folderName + '/';
+            const subfolders = allDirectories.filter(dir => {
+                if (folderName === 'all') {
+                    return !dir.includes('/'); // Top level folders only
+                }
+                return dir.startsWith(currentPrefix) && 
+                       dir.slice(currentPrefix.length).indexOf('/') === -1 &&
+                       dir !== folderName;
+            });
+
+            if (subfolders.length > 0) {
+                const folderElements = subfolders.map(subDir => {
+                    const card = document.createElement('div');
+                    card.className = 'grid-item folder-card';
+                    card.style.width = `${thumbnailWidth}px`;
+                    
+                    const displayName = subDir.split('/').pop();
+                    card.innerHTML = `
+                        <div class="folder-icon">📁</div>
+                        <div class="item-name">${displayName}</div>
+                    `;
+                    card.onclick = () => {
+                        select.value = subDir;
+                        filterGalleryByFolder();
+                    };
+                    return card;
+                });
+                grid.append(...folderElements);
+            }
+            // ------------------------------------
+
             let filesToShow = FOLDER_MAP[folderName] || [];
             let displayList = [...filesToShow];
             
@@ -670,9 +725,13 @@
         }
 
         function appendMediaToGrid(files) {
-            if (files.length === 0) return;
-            
+            // Re-init masonry if we added folders but no files yet
             const grid = document.querySelector('.grid');
+            if (files.length === 0) {
+                 if (!masonry && grid.children.length > 0) initializeMasonry();
+                 return;
+            }
+            
             const thumbnailWidth = document.getElementById('thumbnailWidth').value;
 
             const elements = files.map((fileName) => {
@@ -682,7 +741,6 @@
                 gridItem.style.width = `${thumbnailWidth}px`;
                 gridItem.appendChild(createMediaElement(fileName));
                 
-                // Add info overlay
                 const infoDiv = document.createElement('div');
                 infoDiv.className = 'item-info';
                 infoDiv.innerHTML = `
@@ -736,7 +794,7 @@
             let mediaElement;
             if (isVideo) {
                 mediaElement = document.createElement('video');
-                mediaElement.controls = true;
+                mediaElement.controls = true; // Ensure native controls work
                 mediaElement.autoplay = true;
                 mediaElement.loop = true;
             } else {
@@ -760,8 +818,8 @@
             infoDiv.querySelector('.media-filetype').textContent = `${getFileExtension(mediaInfo.name)} • ${mediaInfo.isVideo ? 'Video' : 'Image'}`;
             
             document.getElementById('prevBtn').disabled = currentMediaIndex <= 0;
-            document.getElementById('nextBtn').disabled = currentMediaFiles.length - 1 <= 0 || currentMediaIndex >= allMediaFiles.length - 1;
-
+            // FIX: Corrected variable name from currentMediaFiles to allMediaFiles
+            document.getElementById('nextBtn').disabled = currentMediaIndex >= allMediaFiles.length - 1;
         }
 
         function navigateFullscreen(direction) {
@@ -778,6 +836,8 @@
             document.getElementById('fullscreenOverlay').classList.remove('visible');
             stopAutoAdvance();
             currentMediaIndex = -1;
+            const content = document.querySelector('.fullscreen-content');
+            content.innerHTML = ''; // Stop video playback
         }
 
         function resetControlsTimer() {
@@ -791,7 +851,6 @@
 
         function startAutoAdvance() {
             stopAutoAdvance();
-            // Set default time to 500ms as requested
             let delay = parseInt(document.getElementById('advanceTime').value);
             if (isNaN(delay) || delay < 500) {
                 delay = 500;
@@ -852,15 +911,20 @@
             }
         });
 
-	   document.getElementById('fullscreenOverlay').addEventListener('mousedown', (e) => {
-				if (e.target.closest('.close-btn, .playback-controls, .nav-btn')) return;
-				e.preventDefault(); // Add this line
-				if (e.button === 0 && currentMediaIndex < allMediaFiles.length - 1) {
-					navigateFullscreen(1);
-				}
-			});
+        document.getElementById('fullscreenOverlay').addEventListener('mousedown', (e) => {
+            if (e.target.closest('.close-btn, .playback-controls, .nav-btn')) return;
+            // FIX: Prevent navigation if clicking video controls
+            if (e.target.tagName === 'VIDEO') return;
+            
+            e.preventDefault();
+            if (e.button === 0 && currentMediaIndex < allMediaFiles.length - 1) {
+                navigateFullscreen(1);
+            }
+        });
 
         document.getElementById('fullscreenOverlay').addEventListener('contextmenu', (e) => {
+            // Allow context menu on videos for controls
+            if (e.target.tagName === 'VIDEO') return;
             e.preventDefault();
             if (currentMediaIndex > 0) navigateFullscreen(-1);
         });
