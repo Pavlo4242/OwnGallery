@@ -29,6 +29,7 @@ char tempExePath[MAX_PATH];
 char currentMediaDir[MAX_PATH];
 char currentPort[10] = "8987";
 HWND hMainWindow = NULL;
+BOOL showConsole = FALSE;
 NOTIFYICONDATA nid = {0};
 
 // Forward declarations
@@ -283,17 +284,27 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     
     CoInitialize(NULL);
     
-    GetCurrentDir(currentDir, sizeof(currentDir));
+    // --- New, more robust argument parsing ---
+    int argc;
+    LPWSTR *argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+    if (argv) {
+        for (int i = 1; i < argc; i++) { // Start at 1 to skip the program name
+            if (wcscmp(argv[i], L"/w") == 0 || wcscmp(argv[i], L"-w") == 0) {
+                showConsole = TRUE; // Set our flag if /w is found
+            } else {
+                // Assume any other argument is the port number
+                // Convert wide-char string to multi-byte string for our port variable
+                WideCharToMultiByte(CP_ACP, 0, argv[i], -1, currentPort, sizeof(currentPort), NULL, NULL);
+            }
+        }
+        LocalFree(argv);
+    }
+GetCurrentDir(currentDir, sizeof(currentDir));
     
     GetTempPath(sizeof(tempExePath), tempExePath);
     snprintf(tempExePath + strlen(tempExePath), sizeof(tempExePath) - strlen(tempExePath), 
              "MediaGallery_%d\\", GetCurrentProcessId());
     CreateDirectory(tempExePath, NULL);
-
-    if (lpCmdLine && strlen(lpCmdLine) > 0) {
-       strncpy(currentPort, lpCmdLine, sizeof(currentPort) - 1);
-       currentPort[sizeof(currentPort) - 1] = '\0';
-    }
     
     snprintf(serverExePath, sizeof(serverExePath), "%sserver.exe", tempExePath);
     if (!ExtractServerBinary(serverExePath)) {
