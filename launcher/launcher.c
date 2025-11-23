@@ -137,15 +137,29 @@ BOOL StartServer(const char* mediaDir, const char* port) {
 
     STARTUPINFO si = {sizeof(si)};
     PROCESS_INFORMATION pi;
-    si.dwFlags = STARTF_USESHOWWINDOW;
-    si.wShowWindow = SW_HIDE;
+    DWORD creationFlags; // We will set this based on our flag
+
+    // --- Conditional logic for showing/hiding the console ---
+    if (showConsole) {
+        // To SHOW the console, we use the default system settings.
+        // A console application will create a console by default.
+        creationFlags = 0; // No special creation flags
+        si.dwFlags = 0;
+        si.wShowWindow = SW_SHOW;
+    } else {
+        // To HIDE the console, we use the original logic.
+        creationFlags = CREATE_NO_WINDOW;
+        si.dwFlags = STARTF_USESHOWWINDOW;
+        si.wShowWindow = SW_HIDE;
+    }
+    // --- End of conditional logic ---
     
     char cmdLine[BUFFER_SIZE];
     snprintf(cmdLine, sizeof(cmdLine), "\"%s\" \"%s\" %s nobrowser", 
              serverExePath, mediaDir, port);
     
     if (!CreateProcess(NULL, cmdLine, NULL, NULL, FALSE, 
-                      CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) {
+                      creationFlags, NULL, NULL, &si, &pi)) { // Pass the conditional creationFlags
         MessageBox(NULL, "Failed to start server", "Error", MB_ICONERROR);
         return FALSE;
     }
