@@ -467,52 +467,63 @@
             grid.innerHTML = '<div class="loading">Loading media files</div>';
             
             try {
-                const response = await fetch('/api/files');
-				
-                if (!response.ok) {
-					throw new Error(`HTTP ${response.status}: Could not load file list from /api/files`);
-                }
-                
-                const fileList = await response.json();
-                
-                if (fileList.length === 0) {
-                    grid.innerHTML = '<div class="loading">No media files found in this folder</div>';
-                    return;
-                }
-                
-                FOLDER_MAP = { 'all': [] };
-                MEDIA_DATA = {};
-                
-                fileList.forEach((fileInfo) => {
-                    const relativePath = fileInfo.path;
-                    const webUrl = '/media/' + relativePath;
-                    MEDIA_DATA[relativePath] = {
-                        url: webUrl,
-                        name: fileInfo.name,
-                        isVideo: fileInfo.isVideo
-                    };
-                    FOLDER_MAP['all'].push(relativePath);
-                    
-                    const parts = relativePath.split('/');
-                    if (parts.length > 1) {
-                        const folderName = parts.slice(0, -1).join('/');
-                        if (!FOLDER_MAP[folderName]) {
-                            FOLDER_MAP[folderName] = [];
-                        }
-                        FOLDER_MAP[folderName].push(relativePath);
-                    }
-                });
-                
-                currentFolderPath = 'Root';
-                updateCurrentFolder();
-                populateFolderFilter();
-                filterGalleryByFolder();
-                
-            } catch (error) {
-                console.error('Error:', error);
-                grid.innerHTML = `<div class="loading">Error: ${error.message}</div>`;
-            }
+        const response = await fetch('/api/files');
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: Could not load file list from /api/files`);
         }
+        
+        // The response now contains 'files' and 'directories'
+        const apiData = await response.json();
+        const fileList = apiData.files || [];
+        const directoryList = apiData.directories || [];
+
+        if (fileList.length === 0 && directoryList.length === 0) {
+            grid.innerHTML = '<div class="loading">No media files or folders found</div>';
+            return;
+        }
+        
+        FOLDER_MAP = { 'all': [] };
+        MEDIA_DATA = {};
+        
+        // Process all directories first to ensure they appear in the filter
+        directoryList.forEach(folderName => {
+            if (!FOLDER_MAP[folderName]) {
+                FOLDER_MAP[folderName] = [];
+            }
+        });
+        
+        // Then, process all files
+        fileList.forEach((fileInfo) => {
+            const relativePath = fileInfo.path;
+            const webUrl = '/media/' + relativePath;
+            MEDIA_DATA[relativePath] = {
+                url: webUrl,
+                name: fileInfo.name,
+                isVideo: fileInfo.isVideo
+            };
+            FOLDER_MAP['all'].push(relativePath);
+            
+            const parts = relativePath.split('/');
+            if (parts.length > 1) {
+                const folderName = parts.slice(0, -1).join('/');
+                // Folder should already exist from the directoryList pass, but check just in case
+                if (!FOLDER_MAP[folderName]) {
+                    FOLDER_MAP[folderName] = [];
+                }
+                FOLDER_MAP[folderName].push(relativePath);
+            }
+        });
+        
+        currentFolderPath = 'Root';
+        updateCurrentFolder();
+        populateFolderFilter();
+        filterGalleryByFolder();
+        
+    } catch (error) {
+        console.error('Error:', error);
+        grid.innerHTML = `<div class="loading">Error: ${error.message}</div>`;
+    }
+}
 
         function populateFolderFilter() {
             const select = document.getElementById('folderFilter');
