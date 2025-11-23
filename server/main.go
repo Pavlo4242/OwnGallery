@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"  // ADD THIS
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -19,8 +20,9 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"    // ADD THIS
 	"time"
-	"fmt" // Added for creating errors and logging
+	"fmt"
 )
 
 //go:embed web/*
@@ -48,16 +50,15 @@ func main() {
 	log.Printf("Media Gallery Server %s (built %s)", Version, BuildTime)
 	log.Printf("Server started with arguments: %v", os.Args) 
     
-    log.Printf("Media Gallery Server %s (built %s)", Version, BuildTime)
-
 	mediaDir, err := os.Getwd()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// Read arguments: [0]=program, [1]=mediaDir, [2]=port, [3]=nobrowser flag
+	// Read arguments: [0]=program, [1]=mediaDir, [2]=port, [3]=nobrowser, [4]=timeout
 	port := "8987"
 	noBrowser := false
+	timeoutMinutes := 0
 	
 	if len(os.Args) > 1 {
 		mediaDir = os.Args[1]
@@ -68,6 +69,13 @@ func main() {
 	if len(os.Args) > 3 && os.Args[3] == "nobrowser" {
 		noBrowser = true
 		log.Println("Browser auto-launch disabled (nobrowser flag)")
+	}
+	if len(os.Args) > 4 {
+		fmt.Sscanf(os.Args[4], "%d", &timeoutMinutes)
+		if timeoutMinutes > 0 {
+			idleTimeout = time.Duration(timeoutMinutes) * time.Minute
+			log.Printf("Idle timeout set to %d minutes", timeoutMinutes)
+		}
 	}
 
 	log.Printf("Serving media from: %s", mediaDir)
@@ -83,6 +91,9 @@ func main() {
 
 	url := "https://localhost:" + port
 	log.Printf("🚀 Gallery ready at: %s", url)
+	if idleTimeout > 0 {
+		log.Printf("⏰ Auto-shutdown after %v of inactivity", idleTimeout)
+	}
 	log.Printf("Press Ctrl+C to stop")
 
 	// Only auto-open browser if NOT launched by launcher AND not explicitly disabled
@@ -94,7 +105,15 @@ func main() {
 		}()
 	}
 
-	// Start HTTPS server
+	// Initialize activity tracking
+	lastActivity = time.Now()
+	
+	// Start idle monitor if timeout is set
+	if idleTimeout > 0 {
+		startIdleMonitor()
+	}
+
+	// Create HTTPS server
 	server := &http.Server{
 		Addr:         ":" + port,
 		ReadTimeout:  15 * time.Second,
@@ -106,8 +125,67 @@ func main() {
 		},
 	}
 
-	log.Fatal(server.ListenAndServeTLS("", ""))
+	// Start server in goroutine
+	go func() {
+		if err := server.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
+			log.Printf("Server error: %v", err)
+		}
+	}()
+
+	// Wait for shutdown signal (either from idle timeout or Ctrl+C)
+	<-shutdownSignal
+
+	// Graceful shutdown
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	log.Println("Gracefully shutting down server...")
+	if err := server.Shutdown(ctx); err != nil {
+		log.Printf("Server shutdown error: %v", err)
+	}
+	log.Println("Server stopped")
 }
+
+var (
+    lastActivity     time.Time
+    activityMutex    sync.Mutex
+    idleTimeout      = 30 * time.Minute // Configurable timeout
+    shutdownSignal   = make(chan bool)
+)
+
+func updateActivity() {
+    activityMutex.Lock()
+    lastActivity = time.Now()
+    activityMutex.Unlock()
+}
+
+func activityMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        updateActivity()
+        next.ServeHTTP(w, r)
+    })
+}
+
+func startIdleMonitor() {
+    ticker := time.NewTicker(1 * time.Minute)
+    go func() {
+        for {
+            select {
+            case <-ticker.C:
+                activityMutex.Lock()
+                idle := time.Since(lastActivity)
+                activityMutex.Unlock()
+                
+                if idle > idleTimeout {
+                    log.Printf("⏰ No activity for %v, shutting down...", idleTimeout)
+                    shutdownSignal <- true
+                    return
+                }
+            }
+        }
+    }()
+}
+
 
 func setupRoutes(mediaDir string) {
 	// Serve embedded web files
@@ -115,84 +193,50 @@ func setupRoutes(mediaDir string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	http.Handle("/", corsMiddleware(http.FileServer(http.FS(webFS))))
+	http.Handle("/", activityMiddleware(corsMiddleware(http.FileServer(http.FS(webFS)))))
 
 	// Serve media files from current directory
-	http.Handle("/media/", corsMiddleware(
-		http.StripPrefix("/media/", http.FileServer(http.Dir(mediaDir)))))
+	http.Handle("/media/", activityMiddleware(corsMiddleware(
+		http.StripPrefix("/media/", http.FileServer(http.Dir(mediaDir))))))
 
 	// API endpoint for file list (with details)
 	http.HandleFunc("/api/files", func(w http.ResponseWriter, r *http.Request) {
-		 files, directories, err := getDetailedFileListAndFolders(mediaDir)
+		updateActivity()
+		files, directories, err := getDetailedFileListAndFolders(mediaDir)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		response := ApiResponse{
-            Files:       files,
-            Directories: directories,
-			}
+			Files:       files,
+			Directories: directories,
+		}
 		
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(response)
 	})
 	
-	// NEW: API endpoint to return the current root directory path
-    http.HandleFunc("/api/root_dir", func(w http.ResponseWriter, r *http.Request) {
-        w.Header().Set("Content-Type", "application/json")
-        json.NewEncoder(w).Encode(map[string]string{
-            "root_dir": mediaDir,
-        })
-    })
-
-    // NEW: API endpoint to open the directory in the native file explorer
-    http.HandleFunc("/api/open_explorer", func(w http.ResponseWriter, r *http.Request) {
-        err := openFileExplorer(mediaDir)
-        if err != nil {
-            http.Error(w, "Failed to open explorer: "+err.Error(), http.StatusInternalServerError)
-            return
-        }
-        w.WriteHeader(http.StatusOK)
-    })
-
-	// NEW: API endpoint to delete a file
-	http.HandleFunc("/api/delete", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "POST" {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-		
-		var req struct {
-			Path string `json:"path"`
-		}
-		
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "Invalid request", http.StatusBadRequest)
-			return
-		}
-		
-		fullPath := filepath.Join(mediaDir, req.Path)
-		
-		// Security: ensure path is within mediaDir
-		if !strings.HasPrefix(filepath.Clean(fullPath), filepath.Clean(mediaDir)) {
-			http.Error(w, "Invalid path", http.StatusForbidden)
-			return
-		}
-		
-		err := os.Remove(fullPath)
-		if err != nil {
-			http.Error(w, "Failed to delete file: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-		
-		log.Printf("Deleted file: %s", fullPath)
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{"status": "deleted"})
+	http.HandleFunc("/api/root_dir", func(w http.ResponseWriter, r *http.Request) {
+		updateActivity()
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{
+			"root_dir": mediaDir,
+		})
 	})
 
-	// Health check endpoint
+	http.HandleFunc("/api/open_explorer", func(w http.ResponseWriter, r *http.Request) {
+		updateActivity()
+		err := openFileExplorer(mediaDir)
+		if err != nil {
+			http.Error(w, "Failed to open explorer: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+
 	http.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
+		updateActivity()
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{
 			"status":  "ok",
