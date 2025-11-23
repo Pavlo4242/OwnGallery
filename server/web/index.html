@@ -1,1027 +1,1670 @@
-1        <!DOCTYPE html>
-2        <html lang="en">
-3        <head>
-4            <meta charset="UTF-8">
-5            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-6            <title>Media Gallery</title>
-7            <style>
-8                * {
-9                    -webkit-user-select: none;
-10                   -moz-user-select: none;
-11                   -ms-user-select: none;
-12                   user-select: none;
-13               }
-14       
-15               body {
-16                   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-17                   margin: 0;
-18                   background-color: #0a0a0a;
-19                   color: #e0e0e0;
-20               }
-21       
-22               .controls {
-23                   padding: 15px;
-24                   background: linear-gradient(135deg, #1e1e1e 0%, #2d2d2d 100%);
-25                   border-bottom: 1px solid #3a3a3a;
-26                   text-align: center;
-27                   position: sticky;
-28                   top: 0;
-29                   z-index: 100;
-30                   backdrop-filter: blur(10px);
-31                   display: flex;
-32                   align-items: center;
-33                   justify-content: space-between;
-34                   flex-wrap: wrap;
-35                   gap: 10px;
-36               }
-37       
-38               .controls-left, .controls-center, .controls-right {
-39                   display: flex;
-40                   align-items: center;
-41                   gap: 10px;
-42                   flex-wrap: wrap;
-43               }
-44       
-45               .controls-center {
-46                   flex: 1;
-47                   justify-content: center;
-48               }
-49       
-50               .current-folder {
-51                   background-color: rgba(76, 175, 80, 0.2);
-52                   border: 1px solid #4CAF50;
-53                   padding: 8px 16px;
-54                   border-radius: 6px;
-55                   color: #4CAF50;
-56                   font-weight: 500;
-57                   display: flex;
-58                   align-items: center;
-59                   gap: 8px;
-60                   max-width: 300px;
-61                   overflow: hidden;
-62               }
-63               
-64               .current-folder-path {
-65                   white-space: nowrap;
-66                   overflow: hidden;
-67                   text-overflow: ellipsis;
-68               }
-69       
-70               .file-counter {
-71                   background-color: rgba(33, 150, 243, 0.2);
-72                   border: 1px solid #2196F3;
-73                   padding: 8px 16px;
-74                   border-radius: 6px;
-75                   color: #2196F3;
-76                   font-weight: 500;
-77               }
-78       
-79               .nav-controls {
-80                   display: flex;
-81                   gap: 5px;
-82                   margin-left: 5px;
-83               }
-84       
-85               .controls label {
-86                   margin-right: 10px;
-87                   color: #b0b0b0;
-88               }
-89       
-90               .controls input[type="range"] {
-91                   width: 200px;
-92                   vertical-align: middle;
-93               }
-94       
-95               .controls select,
-96               .controls button {
-97                   padding: 8px 16px;
-98                   background-color: #2a2a2a;
-99                   color: #e0e0e0;
-100                  border: 1px solid #3a3a3a;
-101                  border-radius: 6px;
-102                  cursor: pointer;
-103                  transition: all 0.2s;
-104              }
-105      
-106              .controls button:hover {
-107                  background-color: #3a3a3a;
-108                  border-color: #4a4a4a;
-109              }
-110      
-111              .controls button:disabled {
-112                  opacity: 0.5;
-113                  cursor: not-allowed;
-114              }
-115      
-116              .grid {
-117                  margin: 20px;
-118                  min-height: 100vh;
-119              }
-120      
-121              .grid-item {
-122                  width: 250px;
-123                  margin-bottom: 15px;
-124                  box-sizing: border-box;
-125                  overflow: hidden;
-126                  cursor: pointer;
-127                  background-color: #1a1a1a;
-128                  border-radius: 12px;
-129                  box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-130                  transition: transform 0.3s ease, box-shadow 0.3s ease;
-131                  position: relative;
-132              }
-133      
-134              .grid-item:hover {
-135                  transform: translateY(-8px);
-136                  box-shadow: 0 12px 24px rgba(0,0,0,0.5);
-137              }
-138      
-139              .grid-item:hover .item-info {
-140                  opacity: 1;
-141              }
-142      
-143              .grid-item img,
-144              .grid-item video {
-145                  display: block;
-146                  width: 100%;
-147                  height: auto;
-148                  border-radius: 12px;
-149                  pointer-events: none;
-150              }
-151      
-152              /* Folder Card Styles */
-153              .folder-card {
-154                  background: #2d2d2d;
-155                  border: 1px solid #3a3a3a;
-156                  display: flex;
-157                  flex-direction: column;
-158                  align-items: center;
-159                  justify-content: center;
-160                  cursor: pointer;
-161                  color: #fff;
-162                  font-size: 14px;
-163                  height: 150px;
-164              }
-165              .folder-card:hover {
-166                  border-color: #4CAF50;
-167                  background: #3a3a3a;
-168              }
-169              .folder-icon {
-170                  font-size: 40px;
-171                  margin-bottom: 10px;
-172              }
-173      
-174              .item-info {
-175                  position: absolute;
-176                  bottom: 0;
-177                  left: 0;
-178                  right: 0;
-179                  background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
-180                  padding: 8px;
-181                  opacity: 0;
-182                  transition: opacity 0.3s;
-183                  font-size: 11px;
-184                  color: #fff;
-185              }
-186      
-187              .item-name {
-188                  font-weight: 500;
-189                  margin-bottom: 2px;
-190                  white-space: nowrap;
-191                  overflow: hidden;
-192                  text-overflow: ellipsis;
-193              }
-194      
-195              .item-type {
-196                  color: #888;
-197                  font-size: 10px;
-198              }
-199      
-200              .fullscreen-overlay {
-201                  position: fixed;
-202                  top: 0;
-203                  left: 0;
-204                  width: 100vw;
-205                  height: 100vh;
-206                  background-color: rgba(0, 0, 0, 0.98);
-207                  display: flex;
-208                  justify-content: center;
-209                  align-items: center;
-210                  z-index: 1000;
-211                  opacity: 0;
-212                  visibility: hidden;
-213                  transition: opacity 0.3s ease, visibility 0.3s ease;
-214              }
-215      
-216              .fullscreen-overlay.visible {
-217                  opacity: 1;
-218                  visibility: visible;
-219              }
-220      
-221              .fullscreen-content {
-222                  position: relative;
-223                  width: 100%;
-224                  height: 100%;
-225                  display: flex;
-226                  justify-content: center;
-227                  align-items: center;
-228                  padding: 20px;
-229                  box-sizing: border-box;
-230              }
-231      
-232              .fullscreen-content img,
-233              .fullscreen-content video {
-234                  width: 100%;
-235                  height: 100%;
-236                  object-fit: contain;
-237                  border-radius: 8px;
-238              }
-239      
-240              .nav-btn {
-241                  position: absolute;
-242                  top: 50%;
-243                  transform: translateY(-50%);
-244                  background-color: rgba(255, 255, 255, 0.1);
-245                  backdrop-filter: blur(10px);
-246                  border: 2px solid rgba(255, 255, 255, 0.2);
-247                  width: 60px;
-248                  height: 60px;
-249                  border-radius: 50%;
-250                  cursor: pointer;
-251                  font-size: 24px;
-252                  font-weight: bold;
-253                  color: #fff;
-254                  display: flex;
-255                  justify-content: center;
-256                  align-items: center;
-257                  transition: all 0.3s ease;
-258                  z-index: 1002;
-259              }
-260      
-261              .nav-btn:hover {
-262                  background-color: rgba(255, 255, 255, 0.2);
-263                  transform: translateY(-50%) scale(1.15);
-264              }
-265      
-266              .nav-btn:disabled {
-267                  opacity: 0.2;
-268                  cursor: not-allowed;
-269              }
-270      
-271              .prev-btn { left: 30px; }
-272              .next-btn { right: 30px; }
-273      
-274              .close-btn {
-275                  position: absolute;
-276                  top: 30px;
-277                  right: 30px;
-278                  color: #fff;
-279                  font-size: 36px;
-280                  cursor: pointer;
-281                  z-index: 1002;
-282                  background-color: rgba(0, 0, 0, 0.6);
-283                  width: 60px;
-284                  height: 60px;
-285                  border-radius: 50%;
-286                  display: flex;
-287                  justify-content: center;
-288                  align-items: center;
-289                  transition: all 0.3s ease;
-290              }
-291      
-292              .close-btn:hover {
-293                  background-color: rgba(255, 50, 50, 0.8);
-294                  transform: rotate(90deg);
-295              }
-296      
-297              .media-info {
-298                  position: absolute;
-299                  bottom: 30px;
-300                  left: 30px;
-301                  color: white;
-302                  background-color: rgba(0, 0, 0, 0.8);
-303                  padding: 12px 24px;
-304                  border-radius: 25px;
-305                  font-size: 14px;
-306                  z-index: 1002;
-307                  backdrop-filter: blur(10px);
-308                  display: flex;
-309                  flex-direction: column;
-310                  gap: 4px;
-311                  max-width: 400px;
-312              }
-313      
-314              .media-counter {
-315                  font-size: 16px;
-316                  font-weight: 600;
-317                  color: #4CAF50;
-318              }
-319      
-320              .media-filename {
-321                  font-size: 13px;
-322                  color: #e0e0e0;
-323                  white-space: nowrap;
-324                  overflow: hidden;
-325                  text-overflow: ellipsis;
-326                  max-width: 100%;
-327              }
-328      
-329              .media-filetype {
-330                  font-size: 11px;
-331                  color: #888;
-332                  text-transform: uppercase;
-333              }
-334      
-335              .playback-controls {
-336                  position: absolute;
-337                  right: 30px;
-338                  top: 50%;
-339                  transform: translateY(-50%);
-340                  background-color: rgba(0, 0, 0, 0.8);
-341                  padding: 20px;
-342                  border-radius: 20px;
-343                  z-index: 1002;
-344                  display: flex;
-345                  flex-direction: column;
-346                  gap: 15px;
-347                  backdrop-filter: blur(10px);
-348                  transition: opacity 0.3s ease;
-349              }
-350      
-351              .playback-controls.auto-hide {
-352                  opacity: 0;
-353                  pointer-events: none;
-354              }
-355      
-356              .playback-controls:hover {
-357                  opacity: 1 !important;
-358                  pointer-events: all !important;
-359              }
-360      
-361              .playback-controls button {
-362                  background-color: rgba(255, 255, 255, 0.15);
-363                  border: 2px solid rgba(255, 255, 255, 0.3);
-364                  color: white;
-365                  padding: 12px 20px;
-366                  border-radius: 25px;
-367                  cursor: pointer;
-368                  font-size: 14px;
-369                  transition: all 0.3s;
-370                  white-space: nowrap;
-371              }
-372      
-373              .playback-controls button:hover {
-374                  background-color: rgba(255, 255, 255, 0.25);
-375              }
-376      
-377              .playback-controls button.active {
-378                  background-color: #4CAF50;
-379                  border-color: #4CAF50;
-380              }
-381      
-382              .loading {
-383                  text-align: center;
-384                  padding: 60px;
-385                  font-size: 20px;
-386                  color: #888;
-387              }
-388      
-389              .loading::after {
-390                  content: '...';
-391                  animation: dots 1.5s steps(4, end) infinite;
-392              }
-393      
-394              @keyframes dots {
-395                  0%, 20% { content: '.'; }
-396                  40% { content: '..'; }
-397                  60%, 100% { content: '...'; }
-398              }
-399      
-400              .scroll-progress {
-401                  position: fixed;
-402                  bottom: 20px;
-403                  right: 20px;
-404                  background-color: rgba(0, 0, 0, 0.8);
-405                  padding: 10px 15px;
-406                  border-radius: 20px;
-407                  font-size: 12px;
-408                  color: #888;
-409                  backdrop-filter: blur(10px);
-410                  z-index: 99;
-411              }
-412          </style>
-413      </head>
-414      <body>
-415          <div class="controls">
-416              <div class="controls-left">
-417                  <div class="current-folder" id="currentFolder" title="The folder being served">
-418                      <span>📁</span>
-419                      <span id="folderName" class="current-folder-path">Loading Root Path...</span>
-420                  </div>
-421                  <button onclick="openExplorer()">📂 Open Folder in Explorer</button>
-422                  <div class="file-counter" id="fileCounter">0 files</div>
-423                  <div class="nav-controls">
-424                      <button onclick="navigateBack()" id="navBackBtn" title="Go Back">←</button>
-425                      <button onclick="navigateRoot()" id="navRootBtn" title="Return to Root">■</button>
-426                      <button onclick="navigateForward()" id="navForwardBtn" title="Go Forward">→</button>
-427                  </div>
-428              </div>
-429              
-430              <div class="controls-center">
-431                  <button onclick="initializeGallery()">🔄 Reload</button>
-432                  <label for="thumbnailWidth">Size:</label>
-433                  <input type="range" id="thumbnailWidth" min="150" max="400" value="250" onchange="saveSettings()">
-434                  <label for="folderFilter">Folder:</label>
-435                  <select id="folderFilter" onchange="filterGalleryByFolder()">
-436                      <option value="all">All Files</option>
-437                  </select>
-438                  <label>
-439                      <input type="checkbox" id="shuffleToggle" onchange="saveSettings()"> Shuffle
-440                  </label>
-441                  <button onclick="forceReshuffle()">🔀 Re-shuffle</button>
-442                  <button onclick="resetViewed()">↺ Reset Viewed</button>
-443              </div>
-444              
-445              <div class="controls-right">
-446                  </div>
-447          </div>
-448      
-449          <div class="grid"></div>
-450          
-451          <div class="scroll-progress" id="scrollProgress">
-452              Loaded: <span id="loadedCount">0</span> / <span id="totalCount">0</span>
-453          </div>
-454      
-455          <div id="fullscreenOverlay" class="fullscreen-overlay">
-456              <span class="close-btn">&times;</span>
-457              <button class="nav-btn prev-btn" id="prevBtn">‹</button>
-458              <button class="nav-btn next-btn" id="nextBtn">›</button>
-459              <div class="fullscreen-content"></div>
-460              <div class="media-info" id="mediaInfo">
-461                  <div class="media-counter"></div>
-462                  <div class="media-filename"></div>
-463                  <div class="media-filetype"></div>
-464              </div>
-465              <div class="playback-controls" id="playbackControls">
-466                  <button id="playPauseBtn">▶ Play</button>
-467                  <div style="text-align: center;">
-468                      <label style="color: white; font-size: 11px;">Speed (ms)</label>
-469                      <input type="number" id="advanceTime" min="500" max="30000" step="100" value="3000" 
-470                             style="width: 100px; padding: 8px; border-radius: 8px; border: none; text-align: center; margin-top: 5px;"
-471                             onchange="saveSettings()">
-472                  </div>
-473                  <button onclick="scrollToTop()">↑ Back to Top</button>
-474              </div>
-475          </div>
-476      
-477          <script src="masonry.pkgd.min.js"></script>
-478          <script src="imagesloaded.pkgd.min.js"></script>
-479      
-480          <script>
-481              let allMediaFiles = [];
-482              let MEDIA_DATA = {};
-483              let FOLDER_MAP = {};
-484              let allDirectories = [];
-485              let masonry;
-486              let loadedMediaCount = 0;
-487              const filesPerLoad = 30;
-488              let currentMediaIndex = -1;
-489              let autoAdvanceInterval = null;
-490              let isPlaying = false;
-491              let viewedFiles = new Set();
-492              let controlsHideTimer = null;
-493              let currentRootPath = 'Loading...';
-494              let globalVolume = 1.0;
-495              
-496              // Navigation History Variables
-497              let navigationHistory = [];
-498              let historyIndex = -1;
-499      
-500              function saveSettings() {
-501                  const settings = {
-502                      thumbWidth: document.getElementById('thumbnailWidth').value,
-503                      shuffle: document.getElementById('shuffleToggle').checked,
-504                      speed: document.getElementById('advanceTime').value
-505                  };
-506                  localStorage.setItem('gallerySettings', JSON.stringify(settings));
-507              }
-508      
-509              function loadSettings() {
-510                  const saved = JSON.parse(localStorage.getItem('gallerySettings'));
-511                  if (saved) {
-512                      if (saved.thumbWidth) document.getElementById('thumbnailWidth').value = saved.thumbWidth;
-513                      if (saved.shuffle) document.getElementById('shuffleToggle').checked = saved.shuffle;
-514                      if (saved.speed) document.getElementById('advanceTime').value = saved.speed;
-515                  }
-516              }
-517      
-518              function updateFileCounter() {
-519                  const total = allMediaFiles.length;
-520                  const loaded = Math.min(loadedMediaCount, total);
-521                  document.getElementById('fileCounter').textContent = `${total} files`;
-522                  document.getElementById('loadedCount').textContent = loaded;
-523                  document.getElementById('totalCount').textContent = total;
-524              }
-525      
-526              async function updateRootPathDisplay() {
-527                  try {
-528                      const response = await fetch('/api/root_dir');
-529                      if (response.ok) {
-530                          const data = await response.json();
-531                          currentRootPath = data.root_dir;
-532                          document.getElementById('folderName').textContent = currentRootPath;
-533                          document.getElementById('currentFolder').title = 'Current Root: ' + currentRootPath;
-534                      } else {
-535                          document.getElementById('folderName').textContent = 'Root Path Error';
-536                      }
-537                  } catch (e) {
-538                      console.error("Failed to fetch root directory:", e);
-539                      document.getElementById('folderName').textContent = 'API Error';
-540                  }
-541              }
-542              
-543              async function openExplorer() {
-544                  try {
-545                      const response = await fetch('/api/open_explorer');
-546                      if (!response.ok) {
-547                          console.error('Failed to open explorer via API:', response.statusText);
-548                          alert('Failed to open folder. Please open manually.');
-549                      }
-550                  } catch (e) {
-551                      console.error("Error calling open_explorer API:", e);
-552                      alert('Connection error.');
-553                  }
-554              }
-555      
-556              async function initializeGallery() {
-557                  const grid = document.querySelector('.grid');
-558                  grid.innerHTML = '<div class="loading">Loading media files</div>';
-559                  
-560                  loadSettings();
-561                  
-562                  // Reset History on full reload
-563                  navigationHistory = [];
-564                  historyIndex = -1;
-565                  updateNavigationButtons();
-566      
-567                  await updateRootPathDisplay();
-568                  
-569                  try {
-570                      const response = await fetch('/api/files');
-571                      if (!response.ok) {
-572                          throw new Error(`HTTP ${response.status}: Could not load file list`);
-573                      }
-574                      
-575                      const apiData = await response.json();
-576                      const fileList = apiData.files || [];
-577                      allDirectories = apiData.directories || [];
-578      
-579                      if (fileList.length === 0 && allDirectories.length === 0) {
-580                          grid.innerHTML = '<div class="loading">No media files or folders found</div>';
-581                          return;
-582                      }
-583                      
-584                      FOLDER_MAP = { 'all': [] };
-585                      MEDIA_DATA = {};
-586                      
-587                      // Process directories
-588                      allDirectories.forEach(folderName => {
-589                          if (!FOLDER_MAP[folderName]) {
-590                              FOLDER_MAP[folderName] = [];
-591                          }
-592                      });
-593                      
-594                      // Process files
-595                      fileList.forEach((fileInfo) => {
-596                          const relativePath = fileInfo.path;
-597                          // FIX: URL Encoding for paths with # or special chars
-598                          const webUrl = '/media/' + relativePath.split('/').map(encodeURIComponent).join('/');
-599                          
-600                          MEDIA_DATA[relativePath] = {
-601                              url: webUrl,
-602                              name: fileInfo.name,
-603                              isVideo: fileInfo.isVideo
-604                          };
-605                          FOLDER_MAP['all'].push(relativePath);
-606                          
-607                          const parts = relativePath.split('/');
-608                          if (parts.length > 1) {
-609                              const folderName = parts.slice(0, -1).join('/');
-610                              if (!FOLDER_MAP[folderName]) {
-611                                  FOLDER_MAP[folderName] = [];
-612                              }
-613                              FOLDER_MAP[folderName].push(relativePath);
-614                          }
-615                      });
-616                      
-617                      populateFolderFilter();
-618                      filterGalleryByFolder(true); // Record initial state
-619                      
-620                  } catch (error) {
-621                      console.error('Error:', error);
-622                      grid.innerHTML = `<div class="loading">Error: ${error.message}</div>`;
-623                  }
-624              }
-625      
-626              function populateFolderFilter() {
-627                  const select = document.getElementById('folderFilter');
-628                  select.innerHTML = '<option value="all">All Files</option>';
-629                  
-630                  Object.keys(FOLDER_MAP).sort().forEach(folderName => {
-631                      if (folderName === 'all') return;
-632                      const option = document.createElement('option');
-633                      option.value = folderName;
-634                      const depth = (folderName.match(/\//g) || []).length;
-635                      option.textContent = '  '.repeat(depth) + folderName + ` (${FOLDER_MAP[folderName].length})`;
-636                      select.appendChild(option);
-637                  });
-638              }
-639      
-640              function updateNavigationButtons() {
-641                  document.getElementById('navBackBtn').disabled = historyIndex <= 0;
-642                  document.getElementById('navForwardBtn').disabled = historyIndex >= navigationHistory.length - 1;
-643              }
-644      
-645              function navigateBack() {
-646                  if (historyIndex > 0) {
-647                      historyIndex--;
-648                      const folder = navigationHistory[historyIndex];
-649                      document.getElementById('folderFilter').value = folder;
-650                      filterGalleryByFolder(false);
-651                  }
-652              }
-653      
-654              function navigateForward() {
-655                  if (historyIndex < navigationHistory.length - 1) {
-656                      historyIndex++;
-657                      const folder = navigationHistory[historyIndex];
-658                      document.getElementById('folderFilter').value = folder;
-659                      filterGalleryByFolder(false);
-660                  }
-661              }
-662      
-663              function navigateRoot() {
-664                  document.getElementById('folderFilter').value = 'all';
-665                  filterGalleryByFolder(true);
-666              }
-667      
-668              function filterGalleryByFolder(recordHistory = true) {
-669                  const select = document.getElementById('folderFilter');
-670                  const folderName = select.value;
-671                  const grid = document.querySelector('.grid');
-672                  const shuffleEnabled = document.getElementById('shuffleToggle').checked;
-673                  const thumbnailWidth = document.getElementById('thumbnailWidth').value;
-674                  
-675                  // History Logic
-676                  if (recordHistory) {
-677                      if (historyIndex === -1 || navigationHistory[historyIndex] !== folderName) {
-678                          // Truncate forward history if we diverge
-679                          navigationHistory = navigationHistory.slice(0, historyIndex + 1);
-680                          navigationHistory.push(folderName);
-681                          historyIndex++;
-682                      }
-683                  }
-684                  updateNavigationButtons();
-685      
-686                  if (masonry) {
-687                      masonry.destroy();
-688                      masonry = null;
-689                  }
-690      
-691      			grid.innerHTML = '';
-692                  
-693                  // --- Folder Navigation Cards ---
-694                  const currentPrefix = folderName === 'all' ? '' : folderName + '/';
-695                  const subfolders = allDirectories.filter(dir => {
-696                      if (folderName === 'all') {
-697                          return !dir.includes('/'); 
-698                      }
-699                      return dir.startsWith(currentPrefix) && 
-700                             dir.slice(currentPrefix.length).indexOf('/') === -1 &&
-701                             dir !== folderName;
-702                  });
-703      
-704                  if (subfolders.length > 0) {
-705                      const folderElements = subfolders.map(subDir => {
-706                          const card = document.createElement('div');
-707                          card.className = 'grid-item folder-card';
-708                          card.style.width = `${thumbnailWidth}px`;
-709                          
-710                          const displayName = subDir.split('/').pop();
-711                          card.innerHTML = `
-712                              <div class="folder-icon">📁</div>
-713                              <div class="item-name">${displayName}</div>
-714                          `;
-715                          card.onclick = () => {
-716                              select.value = subDir;
-717                              filterGalleryByFolder(true);
-718                          };
-719                          return card;
-720                      });
-721                      grid.append(...folderElements);
-722                  }
-723                  // ------------------------------------
-724      
-725                  let filesToShow = FOLDER_MAP[folderName] || [];
-726                  let displayList = [...filesToShow];
-727                  
-728                  if (shuffleEnabled) {
-729                      shuffleArray(displayList);
-730                  }
-731                  
-732                  allMediaFiles = displayList;
-733                  loadedMediaCount = 0;
-734                  updateFileCounter();
-735                  loadMoreMedia();
-736                  saveSettings();
-737              }
-738      
-739              function shuffleArray(array) {
-740                  const unviewed = array.filter(file => !viewedFiles.has(file));
-741                  const viewed = array.filter(file => viewedFiles.has(file));
-742                  
-743                  for (let i = unviewed.length - 1; i > 0; i--) {
-744                      const j = Math.floor(Math.random() * (i + 1));
-745                      [unviewed[i], unviewed[j]] = [unviewed[j], unviewed[i]];
-746                  }
-747                  
-748                  for (let i = viewed.length - 1; i > 0; i--) {
-749                      const j = Math.floor(Math.random() * (i + 1));
-750                      [viewed[i], viewed[j]] = [viewed[j], viewed[i]];
-751                  }
-752                  
-753                  array.length = 0;
-754                  array.push(...unviewed, ...viewed);
-755              }
-756      
-757              function forceReshuffle() {
-758                  filterGalleryByFolder(false); // Don't record history for reshuffle
-759              }
-760      
-761              function resetViewed() {
-762                  viewedFiles.clear();
-763                  filterGalleryByFolder(false);
-764              }
-765      
-766              function scrollToTop() {
-767                  const overlay = document.getElementById('fullscreenOverlay');
-768                  if (overlay.classList.contains('visible')) {
-769                      closeFullscreen();
-770                  }
-771                  window.scrollTo({ top: 0, behavior: 'smooth' });
-772              }
-773      
-774              function getFileExtension(fileName) {
-775                  const parts = fileName.split('.');
-776                  return parts.length > 1 ? parts[parts.length - 1].toUpperCase() : 'FILE';
-777              }
-778      
-779              function createMediaElement(fileName) {
-780                  const mediaInfo = MEDIA_DATA[fileName];
-781                  const isVideo = mediaInfo.isVideo;
-782                  let mediaElement;
-783      
-784                  if (isVideo) {
-785                      mediaElement = document.createElement('video');
-786                      mediaElement.autoplay = false;
-787                      mediaElement.muted = true;
-788                      mediaElement.loop = true;
-789                      mediaElement.preload = 'metadata';
-790                  } else {
-791                      mediaElement = document.createElement('img');
-792                      mediaElement.loading = 'lazy';
-793                  }
-794      
-795                  mediaElement.src = mediaInfo.url;
-796                  return mediaElement;
-797              }
-798      
-799              function initializeMasonry() {
-800                  const grid = document.querySelector('.grid');
-801                  if (masonry) masonry.destroy();
-802                  
-803                  masonry = new Masonry(grid, {
-804                      itemSelector: '.grid-item',
-805                      columnWidth: parseInt(document.getElementById('thumbnailWidth').value),
-806                      gutter: 15,
-807                      fitWidth: true
-808                  });
-809              }
-810      
-811              function appendMediaToGrid(files) {
-812                  const grid = document.querySelector('.grid');
-813                  if (files.length === 0) {
-814                       if (!masonry && grid.children.length > 0) initializeMasonry();
-815                       return;
-816                  }
-817                  
-818                  const thumbnailWidth = document.getElementById('thumbnailWidth').value;
-819      
-820                  const elements = files.map((fileName) => {
-821                      const mediaInfo = MEDIA_DATA[fileName];
-822                      const gridItem = document.createElement('div');
-823                      gridItem.classList.add('grid-item');
-824                      gridItem.style.width = `${thumbnailWidth}px`;
-825                      gridItem.appendChild(createMediaElement(fileName));
-826                      
-827                      const infoDiv = document.createElement('div');
-828                      infoDiv.className = 'item-info';
-829                      infoDiv.innerHTML = `
-830                          <div class="item-name" title="${mediaInfo.name}">${mediaInfo.name}</div>
-831                          <div class="item-type">${getFileExtension(mediaInfo.name)} • ${mediaInfo.isVideo ? 'Video' : 'Image'}</div>
-832                      `;
-833                      gridItem.appendChild(infoDiv);
-834                      
-835                      gridItem.addEventListener('click', () => openFullscreen(fileName));
-836                      return gridItem;
-837                  });
-838      
-839                  grid.append(...elements);
-840      
-841                  if (masonry) {
-842                      masonry.appended(elements);
-843                      imagesLoaded(elements, () => masonry.layout());
-844                  } else {
-845                      imagesLoaded(elements, () => {
-846                          if(!masonry){
-847      			            initializeMasonry();
-848                              setTimeout(() => masonry && masonry.layout(), 50);
-849                   		}
-850      		        });
-851                  }
-852                  
-853                  updateFileCounter();
-854              }
-855      
-856              function loadMoreMedia() {
-857                  const nextBatch = allMediaFiles.slice(loadedMediaCount, loadedMediaCount + filesPerLoad);
-858                  if (nextBatch.length > 0) {
-859                      appendMediaToGrid(nextBatch);
-860                      loadedMediaCount += nextBatch.length;
-861                  }
-862              }
-863      
-864              function openFullscreen(fileName) {
-865                  const overlay = document.getElementById('fullscreenOverlay');
-866                  const content = document.querySelector('.fullscreen-content');
-867                  
-868                  currentMediaIndex = allMediaFiles.indexOf(fileName);
-869                  if (currentMediaIndex === -1) return;
-870                  
-871                  viewedFiles.add(fileName);
-872                  
-873                  const mediaInfo = MEDIA_DATA[fileName];
-874                  const isVideo = mediaInfo.isVideo;
-875                  content.innerHTML = '';
-876      
-877                  let mediaElement;
-878                  if (isVideo) {
-879                      mediaElement = document.createElement('video');
-880                      mediaElement.controls = true; 
-881                      mediaElement.autoplay = true;
-882                      mediaElement.loop = true;
-883                      mediaElement.volume = globalVolume; 
-884                      mediaElement.onvolumechange = (e) => globalVolume = e.target.volume;
-885                  } else {
-886                      mediaElement = document.createElement('img');
-887                  }
-888      
-889                  mediaElement.src = mediaInfo.url;
-890                  content.appendChild(mediaElement);
-891      
-892                  updateFullscreenInfo(fileName);
-893                  overlay.classList.add('visible');
-894                  resetControlsTimer();
-895              }
-896      
-897              function updateFullscreenInfo(fileName) {
-898                  const mediaInfo = MEDIA_DATA[fileName];
-899                  const infoDiv = document.getElementById('mediaInfo');
-900                  
-901                  infoDiv.querySelector('.media-counter').textContent = `${currentMediaIndex + 1} / ${allMediaFiles.length}`;
-902                  infoDiv.querySelector('.media-filename').textContent = mediaInfo.name;
-903                  infoDiv.querySelector('.media-filetype').textContent = `${getFileExtension(mediaInfo.name)} • ${mediaInfo.isVideo ? 'Video' : 'Image'}`;
-904                  
-905                  document.getElementById('prevBtn').disabled = currentMediaIndex <= 0;
-906                  document.getElementById('nextBtn').disabled = currentMediaIndex >= allMediaFiles.length - 1;
-907              }
-908      
-909              function navigateFullscreen(direction) {
-910                  const newIndex = currentMediaIndex + direction;
-911                  if (newIndex >= 0 && newIndex < allMediaFiles.length) {
-912                      currentMediaIndex = newIndex;
-913                      openFullscreen(allMediaFiles[currentMediaIndex]);
-914                  } else if (newIndex >= allMediaFiles.length) {
-915                      stopAutoAdvance();
-916                  }
-917              }
-918      
-919              function closeFullscreen() {
-920                  document.getElementById('fullscreenOverlay').classList.remove('visible');
-921                  stopAutoAdvance();
-922                  currentMediaIndex = -1;
-923                  const content = document.querySelector('.fullscreen-content');
-924                  content.innerHTML = ''; 
-925              }
-926      
-927              function resetControlsTimer() {
-928                  const controls = document.getElementById('playbackControls');
-929                  controls.classList.remove('auto-hide');
-930                  clearTimeout(controlsHideTimer);
-931                  controlsHideTimer = setTimeout(() => {
-932                      if (isPlaying) controls.classList.add('auto-hide');
-933                  }, 3000);
-934              }
-935      
-936              function startAutoAdvance() {
-937                  stopAutoAdvance();
-938                  let delay = parseInt(document.getElementById('advanceTime').value);
-939                  if (isNaN(delay) || delay < 500) {
-940                      delay = 500;
-941                      document.getElementById('advanceTime').value = 500;
-942                  }
-943      
-944                  autoAdvanceInterval = setInterval(() => {
-945                      if (currentMediaIndex < allMediaFiles.length - 1) {
-946                          navigateFullscreen(1);
-947                      } else {
-948                          stopAutoAdvance();
-949                      }
-950                  }, delay);
-951                  isPlaying = true;
-952                  document.getElementById('playPauseBtn').textContent = '⏸ Pause';
-953                  document.getElementById('playPauseBtn').classList.add('active');
-954              }
-955      
-956              function stopAutoAdvance() {
-957                  if (autoAdvanceInterval) {
-958                      clearInterval(autoAdvanceInterval);
-959                      autoAdvanceInterval = null;
-960                  }
-961                  isPlaying = false;
-962                  document.getElementById('playPauseBtn').textContent = '▶ Play';
-963                  document.getElementById('playPauseBtn').classList.remove('active');
-964              }
-965      
-966              // Event Listeners
-967              document.getElementById('thumbnailWidth').addEventListener('input', (e) => {
-968                  const newWidth = parseInt(e.target.value);
-969                  document.querySelectorAll('.grid-item').forEach(item => {
-970                      item.style.width = `${newWidth}px`;
-971                  });
-972                  if (masonry) {
-973                      masonry.options.columnWidth = newWidth;
-974                      masonry.layout();
-975                  }
-976              });
-977      
-978              document.querySelector('.close-btn').addEventListener('click', closeFullscreen);
-979              document.getElementById('prevBtn').addEventListener('click', () => navigateFullscreen(-1));
-980              document.getElementById('nextBtn').addEventListener('click', () => navigateFullscreen(1));
-981              document.getElementById('playPauseBtn').addEventListener('click', () => {
-982                  isPlaying ? stopAutoAdvance() : startAutoAdvance();
-983              });
-984      
-985              document.addEventListener('keydown', (e) => {
-986                  const overlay = document.getElementById('fullscreenOverlay');
-987                  if (!overlay.classList.contains('visible')) return;
-988                  
-989                  if (e.key === 'ArrowRight' || e.key === 'd') navigateFullscreen(1);
-990                  else if (e.key === 'ArrowLeft' || e.key === 'a') navigateFullscreen(-1);
-991                  else if (e.key === 'Escape') closeFullscreen();
-992                  else if (e.key === ' ') {
-993                      e.preventDefault();
-994                      isPlaying ? stopAutoAdvance() : startAutoAdvance();
-995                  }
-996              });
-997      
-998              document.getElementById('fullscreenOverlay').addEventListener('mousedown', (e) => {
-999                  if (e.target.closest('.close-btn, .playback-controls, .nav-btn')) return;
-1000                 if (e.target.tagName === 'VIDEO') return;
-1001                 
-1002                 e.preventDefault();
-1003                 if (e.button === 0 && currentMediaIndex < allMediaFiles.length - 1) {
-1004                     navigateFullscreen(1);
-1005                 }
-1006             });
-1007     
-1008             document.getElementById('fullscreenOverlay').addEventListener('contextmenu', (e) => {
-1009                 if (e.target.tagName === 'VIDEO') return;
-1010                 e.preventDefault();
-1011                 if (currentMediaIndex > 0) navigateFullscreen(-1);
-1012             });
-1013     
-1014             document.getElementById('fullscreenOverlay').addEventListener('mousemove', resetControlsTimer);
-1015     
-1016             window.addEventListener('scroll', () => {
-1017                 if ((window.innerHeight + window.scrollY) >= (document.body.offsetHeight - 500) &&
-1018                     loadedMediaCount < allMediaFiles.length) {
-1019                     loadMoreMedia();
-1020                 }
-1021             });
-1022     
-1023             window.addEventListener('DOMContentLoaded', initializeGallery);
-1024         </script>
-1025     </body>
-1026     </html>
-1027     
+     <!DOCTYPE html>
+     <html lang="en">
+     <head>
+         <meta charset="UTF-8">
+         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+         <title>Media Gallery</title>
+         <style>
+             * {
+                 -webkit-user-select: none;
+                 -moz-user-select: none;
+                 -ms-user-select: none;
+                 user-select: none;
+             }
+     
+             body {
+                 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                 margin: 0;
+                 background-color: #0a0a0a;
+                 color: #e0e0e0;
+             }
+     
+             .controls {
+                 padding: 15px;
+                 background: linear-gradient(135deg, #1e1e1e 0%, #2d2d2d 100%);
+                 border-bottom: 1px solid #3a3a3a;
+                 text-align: center;
+                 position: sticky;
+                 top: 0;
+                 z-index: 100;
+                 backdrop-filter: blur(10px);
+                 display: flex;
+                 align-items: center;
+                 justify-content: space-between;
+                 flex-wrap: wrap;
+                 gap: 10px;
+             }
+     
+             .controls-left, .controls-center, .controls-right {
+                 display: flex;
+                 align-items: center;
+                 gap: 10px;
+                 flex-wrap: wrap;
+             }
+     
+             .controls-center {
+                 flex: 1;
+                 justify-content: center;
+             }
+     
+             .current-folder {
+                 background-color: rgba(76, 175, 80, 0.2);
+                 border: 1px solid #4CAF50;
+                 padding: 8px 16px;
+                 border-radius: 6px;
+                 color: #4CAF50;
+                 font-weight: 500;
+                 display: flex;
+                 align-items: center;
+                 gap: 8px;
+                 max-width: 300px;
+                 overflow: hidden;
+             }
+             
+             .current-folder-path {
+                 white-space: nowrap;
+                 overflow: hidden;
+                 text-overflow: ellipsis;
+             }
+     
+             .file-counter {
+                 background-color: rgba(33, 150, 243, 0.2);
+                 border: 1px solid #2196F3;
+                 padding: 8px 16px;
+                 border-radius: 6px;
+                 color: #2196F3;
+                 font-weight: 500;
+             }
+     
+             .nav-controls {
+                 display: flex;
+                 gap: 5px;
+                 margin-left: 5px;
+             }
+     
+             .controls label {
+                 margin-right: 10px;
+                 color: #b0b0b0;
+             }
+     
+             .controls input[type="range"] {
+                 width: 200px;
+                 vertical-align: middle;
+             }
+     
+             .controls select,
+             .controls button {
+                 padding: 8px 16px;
+                 background-color: #2a2a2a;
+                 color: #e0e0e0;
+                 border: 1px solid #3a3a3a;
+                 border-radius: 6px;
+                 cursor: pointer;
+                 transition: all 0.2s;
+             }
+     
+             .controls button:hover {
+                 background-color: #3a3a3a;
+                 border-color: #4a4a4a;
+             }
+     
+             .controls button:disabled {
+                 opacity: 0.5;
+                 cursor: not-allowed;
+             }
+     
+             .grid {
+                 margin: 20px;
+                 min-height: 100vh;
+             }
+     
+             .grid-item {
+                 width: 250px;
+                 margin-bottom: 15px;
+                 box-sizing: border-box;
+                 overflow: hidden;
+                 cursor: pointer;
+                 background-color: #1a1a1a;
+                 border-radius: 12px;
+                 box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+                 transition: transform 0.3s ease, box-shadow 0.3s ease;
+                 position: relative;
+             }
+     
+             .grid-item:hover {
+                 transform: translateY(-8px);
+                 box-shadow: 0 12px 24px rgba(0,0,0,0.5);
+             }
+     
+             .grid-item:hover .item-info {
+                 opacity: 1;
+             }
+     
+             .grid-item img,
+             .grid-item video {
+                 display: block;
+                 width: 100%;
+                 height: auto;
+                 border-radius: 12px;
+                 pointer-events: none;
+             }
+     
+             /* Folder Card Styles */
+             .folder-card {
+                 background: #2d2d2d;
+                 border: 1px solid #3a3a3a;
+                 display: flex;
+                 flex-direction: column;
+                 align-items: center;
+                 justify-content: center;
+                 cursor: pointer;
+                 color: #fff;
+                 font-size: 14px;
+                 height: 150px;
+             }
+             .folder-card:hover {
+                 border-color: #4CAF50;
+                 background: #3a3a3a;
+             }
+             .folder-icon {
+                 font-size: 40px;
+                 margin-bottom: 10px;
+             }
+     
+             .item-info {
+                 position: absolute;
+                 bottom: 0;
+                 left: 0;
+                 right: 0;
+                 background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
+                 padding: 8px;
+                 opacity: 0;
+                 transition: opacity 0.3s;
+                 font-size: 11px;
+                 color: #fff;
+             }
+     
+             .item-name {
+                 font-weight: 500;
+                 margin-bottom: 2px;
+                 white-space: nowrap;
+                 overflow: hidden;
+                 text-overflow: ellipsis;
+             }
+     
+             .item-type {
+                 color: #888;
+                 font-size: 10px;
+             }
+     
+             .fullscreen-overlay {
+                 position: fixed;
+                 top: 0;
+                 left: 0;
+                 width: 100vw;
+                 height: 100vh;
+                 background-color: rgba(0, 0, 0, 0.98);
+                 display: flex;
+                 justify-content: center;
+                 align-items: center;
+                 z-index: 1000;
+                 opacity: 0;
+                 visibility: hidden;
+                 transition: opacity 0.3s ease, visibility 0.3s ease;
+             }
+     
+             .fullscreen-overlay.visible {
+                 opacity: 1;
+                 visibility: visible;
+             }
+     
+             .fullscreen-content {
+                 position: relative;
+                 width: 100%;
+                 height: 100%;
+                 display: flex;
+                 justify-content: center;
+                 align-items: center;
+                 padding: 20px;
+                 box-sizing: border-box;
+             }
+     
+             .fullscreen-content img,
+             .fullscreen-content video {
+                 width: 100%;
+                 height: 100%;
+                 object-fit: contain;
+                 border-radius: 8px;
+             }
+     
+             .nav-btn {
+                 position: absolute;
+                 top: 50%;
+                 transform: translateY(-50%);
+                 background-color: rgba(255, 255, 255, 0.1);
+                 backdrop-filter: blur(10px);
+                 border: 2px solid rgba(255, 255, 255, 0.2);
+                 width: 60px;
+                 height: 60px;
+                 border-radius: 50%;
+                 cursor: pointer;
+                 font-size: 24px;
+                 font-weight: bold;
+                 color: #fff;
+                 display: flex;
+                 justify-content: center;
+                 align-items: center;
+                 transition: all 0.3s ease;
+                 z-index: 1002;
+             }
+     
+             .nav-btn:hover {
+                 background-color: rgba(255, 255, 255, 0.2);
+                 transform: translateY(-50%) scale(1.15);
+             }
+     
+             .nav-btn:disabled {
+                 opacity: 0.2;
+                 cursor: not-allowed;
+             }
+     
+             .prev-btn { left: 30px; }
+             .next-btn { right: 30px; }
+     
+             .close-btn {
+                 position: absolute;
+                 top: 30px;
+                 right: 30px;
+                 color: #fff;
+                 font-size: 36px;
+                 cursor: pointer;
+                 z-index: 1002;
+                 background-color: rgba(0, 0, 0, 0.6);
+                 width: 60px;
+                 height: 60px;
+                 border-radius: 50%;
+                 display: flex;
+                 justify-content: center;
+                 align-items: center;
+                 transition: all 0.3s ease;
+             }
+     
+             .close-btn:hover {
+                 background-color: rgba(255, 50, 50, 0.8);
+                 transform: rotate(90deg);
+             }
+     
+             .media-info {
+                 position: absolute;
+                 bottom: 30px;
+                 left: 30px;
+                 color: white;
+                 background-color: rgba(0, 0, 0, 0.8);
+                 padding: 12px 24px;
+                 border-radius: 25px;
+                 font-size: 14px;
+                 z-index: 1002;
+                 backdrop-filter: blur(10px);
+                 display: flex;
+                 flex-direction: column;
+                 gap: 4px;
+                 max-width: 400px;
+             }
+     
+             .media-counter {
+                 font-size: 16px;
+                 font-weight: 600;
+                 color: #4CAF50;
+             }
+     
+             .media-filename {
+                 font-size: 13px;
+                 color: #e0e0e0;
+                 white-space: nowrap;
+                 overflow: hidden;
+                 text-overflow: ellipsis;
+                 max-width: 100%;
+             }
+     
+             .media-filetype {
+                 font-size: 11px;
+                 color: #888;
+                 text-transform: uppercase;
+             }
+     
+             .playback-controls {
+                 position: absolute;
+                 right: 30px;
+                 top: 50%;
+                 transform: translateY(-50%);
+                 background-color: rgba(0, 0, 0, 0.8);
+                 padding: 20px;
+                 border-radius: 20px;
+                 z-index: 1002;
+                 display: flex;
+                 flex-direction: column;
+                 gap: 15px;
+                 backdrop-filter: blur(10px);
+                 transition: opacity 0.3s ease;
+             }
+     
+             .playback-controls.auto-hide {
+                 opacity: 0;
+                 pointer-events: none;
+             }
+     
+             .playback-controls:hover {
+                 opacity: 1 !important;
+                 pointer-events: all !important;
+             }
+     
+             .playback-controls button {
+                 background-color: rgba(255, 255, 255, 0.15);
+                 border: 2px solid rgba(255, 255, 255, 0.3);
+                 color: white;
+                 padding: 12px 20px;
+                 border-radius: 25px;
+                 cursor: pointer;
+                 font-size: 14px;
+                 transition: all 0.3s;
+                 white-space: nowrap;
+             }
+     
+             .playback-controls button:hover {
+                 background-color: rgba(255, 255, 255, 0.25);
+             }
+     
+             .playback-controls button.active {
+                 background-color: #4CAF50;
+                 border-color: #4CAF50;
+             }
+     
+             .loading {
+                 text-align: center;
+                 padding: 60px;
+                 font-size: 20px;
+                 color: #888;
+             }
+     
+             .loading::after {
+                 content: '...';
+                 animation: dots 1.5s steps(4, end) infinite;
+             }
+     
+             @keyframes dots {
+                 0%, 20% { content: '.'; }
+                 40% { content: '..'; }
+                 60%, 100% { content: '...'; }
+             }
+     
+             .scroll-progress {
+                 position: fixed;
+                 bottom: 20px;
+                 right: 20px;
+                 background-color: rgba(0, 0, 0, 0.8);
+                 padding: 10px 15px;
+                 border-radius: 20px;
+                 font-size: 12px;
+                 color: #888;
+                 backdrop-filter: blur(10px);
+                 z-index: 99;
+             }
+			 .top-left-close {
+				position: absolute;
+				top: 30px;
+				left: 30px;
+				color: #fff;
+				font-size: 36px;
+				cursor: pointer;
+				z-index: 1002;
+				background-color: rgba(0, 0, 0, 0.6);
+				width: 60px;
+				height: 60px;
+				border-radius: 50%;
+				display: flex;
+				justify-content: center;
+				align-items: center;
+				transition: all 0.3s ease;
+			}
+
+			.top-left-close:hover {
+				background-color: rgba(255, 50, 50, 0.8);
+				transform: rotate(90deg);
+			}
+
+			.bottom-right-root {
+				position: absolute;
+				bottom: 30px;
+				right: 30px;
+				background-color: rgba(0, 0, 0, 0.8);
+				color: white;
+				padding: 12px 20px;
+				border-radius: 25px;
+				cursor: pointer;
+				z-index: 1002;
+				font-size: 14px;
+				border: 2px solid rgba(255, 255, 255, 0.3);
+				transition: all 0.3s;
+				backdrop-filter: blur(10px);
+			}
+
+			.bottom-right-root:hover {
+				background-color: rgba(76, 175, 80, 0.8);
+				border-color: #4CAF50;
+			}
+			/* List View Styles */
+			.list-view {
+				display: flex;
+				flex-direction: column;
+				gap: 10px;
+			}
+
+			.list-item {
+				display: flex;
+				align-items: center;
+				gap: 15px;
+				background-color: #1a1a1a;
+				padding: 12px;
+				border-radius: 8px;
+				cursor: pointer;
+				transition: all 0.2s;
+			}
+
+			.list-item:hover {
+				background-color: #2a2a2a;
+				transform: translateX(5px);
+			}
+
+			.list-item-thumbnail {
+				width: 80px;
+				height: 80px;
+				object-fit: cover;
+				border-radius: 6px;
+				flex-shrink: 0;
+			}
+
+			.list-item-info {
+				flex: 1;
+				min-width: 0;
+			}
+
+			.list-item-name {
+				font-weight: 500;
+				margin-bottom: 4px;
+				white-space: nowrap;
+				overflow: hidden;
+				text-overflow: ellipsis;
+			}
+
+			.list-item-meta {
+				font-size: 12px;
+				color: #888;
+			}
+
+			/* Multi-select Styles */
+			.grid-item-checkbox {
+				position: absolute;
+				top: 8px;
+				left: 8px;
+				width: 24px;
+				height: 24px;
+				z-index: 10;
+				cursor: pointer;
+				opacity: 0;
+				transition: opacity 0.2s;
+			}
+
+			.grid-item:hover .grid-item-checkbox,
+			.grid-item-checkbox:checked {
+				opacity: 1;
+			}
+
+			.grid-item.selected {
+				outline: 3px solid #ff9800;
+				outline-offset: -3px;
+			}
+
+			/* Favorite Star */
+			.favorite-star {
+				position: absolute;
+				top: 8px;
+				right: 8px;
+				width: 32px;
+				height: 32px;
+				background-color: rgba(0, 0, 0, 0.6);
+				border-radius: 50%;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				cursor: pointer;
+				z-index: 10;
+				opacity: 0;
+				transition: all 0.2s;
+			}
+
+			.grid-item:hover .favorite-star,
+			.favorite-star.is-favorite {
+				opacity: 1;
+			}
+
+			.favorite-star:hover {
+				background-color: rgba(0, 0, 0, 0.8);
+				transform: scale(1.1);
+			}
+
+			.favorite-star.is-favorite {
+				color: #ffd700;
+			}
+
+			/* Quick Preview Overlay */
+			.quick-preview-overlay {
+				position: fixed;
+				top: 50%;
+				left: 50%;
+				transform: translate(-50%, -50%);
+				z-index: 999;
+				max-width: 70vw;
+				max-height: 70vh;
+				background-color: rgba(0, 0, 0, 0.95);
+				border: 2px solid rgba(255, 255, 255, 0.2);
+				border-radius: 12px;
+				padding: 20px;
+				box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+				pointer-events: none;
+				backdrop-filter: blur(10px);
+			}
+
+			.quick-preview-overlay img,
+			.quick-preview-overlay video {
+				max-width: 100%;
+				max-height: 60vh;
+				border-radius: 8px;
+			}
+
+			.quick-preview-info {
+				margin-top: 12px;
+				text-align: center;
+				color: white;
+				font-size: 14px;
+			}
+
+			/* Vertical Progress Bar */
+			.vertical-progress-bar {
+				position: fixed;
+				left: 0;
+				top: 0;
+				width: 6px;
+				height: 100vh;
+				background-color: rgba(0, 0, 0, 0.3);
+				z-index: 1001;
+				transition: opacity 0.3s;
+			}
+
+			.vertical-progress-fill {
+				width: 100%;
+				background: linear-gradient(to bottom, #4CAF50, #2196F3);
+				transition: height 0.3s linear;
+			}
+
+			/* View Mode Toggle Buttons */
+			.view-mode-toggle {
+				display: flex;
+				gap: 5px;
+				background-color: #2a2a2a;
+				padding: 4px;
+				border-radius: 6px;
+				border: 1px solid #3a3a3a;
+			}
+
+			.view-mode-btn {
+				padding: 6px 12px;
+				background-color: transparent;
+				color: #e0e0e0;
+				border: none;
+				border-radius: 4px;
+				cursor: pointer;
+				transition: all 0.2s;
+			}
+
+			.view-mode-btn.active {
+				background-color: #2196F3;
+			}
+
+			.view-mode-btn:hover:not(.active) {
+				background-color: #3a3a3a;
+			}	
+			
+			 
+			 
+         </style>
+     </head>
+     <body>
+         <div class="controls">
+    <div class="controls-left">
+        <div class="current-folder" id="currentFolder" title="The folder being served">
+            <span>📁</span>
+            <span id="folderName" class="current-folder-path">Loading Root Path...</span>
+        </div>
+        <button onclick="openExplorer()">📂 Open Folder in Explorer</button>
+        <div class="file-counter" id="fileCounter">0 files</div>
+        <div class="nav-controls">
+            <button onclick="navigateBack()" id="navBackBtn" title="Go Back">←</button>
+            <button onclick="navigateRoot()" id="navRootBtn" title="Return to Root">■</button>
+            <button onclick="navigateForward()" id="navForwardBtn" title="Go Forward">→</button>
+        </div>
+    </div>
+    
+    <div class="controls-center">
+        <!-- View Mode Toggle -->
+        <div class="view-mode-toggle">
+            <button class="view-mode-btn active" id="gridViewBtn" onclick="setViewMode('grid')" title="Grid View">
+                ▦
+            </button>
+            <button class="view-mode-btn" id="listViewBtn" onclick="setViewMode('list')" title="List View">
+                ☰
+            </button>
+        </div>
+        
+        <button onclick="initializeGallery()">🔄 Reload</button>
+        
+        <label>
+            <input type="checkbox" id="quickPreviewToggle" onchange="saveSettings()" checked> Quick Preview
+        </label>
+        
+        <label>
+            <input type="checkbox" id="multiSelectToggle" onchange="toggleMultiSelect()"> Multi-Select
+        </label>
+        
+        <button onclick="deleteSelected()" id="deleteBtn" style="display:none;" class="delete-btn">
+            🗑️ Delete (<span id="selectedCount">0</span>)
+        </button>
+        
+        <label for="thumbnailWidth">Size:</label>
+        <input type="range" id="thumbnailWidth" min="150" max="400" value="250" onchange="saveSettings()">
+        
+        <label for="folderFilter">Folder:</label>
+        <select id="folderFilter" onchange="filterGalleryByFolder()">
+            <option value="all">All Files</option>
+        </select>
+        
+        <button onclick="filterFavorites()">⭐ Favorites</button>
+        
+        <label>
+            <input type="checkbox" id="shuffleToggle" onchange="saveSettings()"> Shuffle
+        </label>
+        <button onclick="forceReshuffle()">🔀 Re-shuffle</button>
+        <button onclick="resetViewed()">↺ Reset Viewed</button>
+    </div>
+    
+    <div class="controls-right">
+    </div>
+</div>
+     
+         <div class="grid"></div>
+         
+         <div class="scroll-progress" id="scrollProgress">
+             Loaded: <span id="loadedCount">0</span> / <span id="totalCount">0</span>
+         </div>
+     
+         <div id="fullscreenOverlay" class="fullscreen-overlay">
+    <span class="top-left-close" onclick="closeFullscreen()">&times;</span>
+    <span class="close-btn" onclick="closeFullscreen()">&times;</span>
+    <button class="nav-btn prev-btn" id="prevBtn">‹</button>
+    <button class="nav-btn next-btn" id="nextBtn">›</button>
+    <div class="fullscreen-content"></div>
+    <div class="media-info" id="mediaInfo">
+        <div class="media-counter"></div>
+        <div class="media-filename"></div>
+        <div class="media-filetype"></div>
+    </div>
+    <div class="playback-controls" id="playbackControls">
+    <button id="playPauseBtn">▶ Play</button>
+    <button id="toggleShuffleBtn" onclick="toggleShuffleInSlideshow()">🔀 Shuffle: OFF</button>
+    <button id="sequentialModeBtn" onclick="toggleSequentialMode()">
+        📋 Mode: <span id="modeText">Sequential</span>
+    </button>
+    <div style="text-align: center;">
+        <label style="color: white; font-size: 11px;">Speed (ms)</label>
+        <input type="number" id="advanceTime" min="500" max="30000" step="100" value="3000" 
+               style="width: 100px; padding: 8px; border-radius: 8px; border: none; text-align: center; margin-top: 5px;"
+               onchange="saveSettings()">
+    </div>
+    <button onclick="scrollToTop()">↑ Back to Top</button>
+</div>
+
+<!-- Vertical Progress Bar -->
+<div id="verticalProgress" class="vertical-progress-bar" style="display: none;">
+    <div class="vertical-progress-fill" id="progressFill" style="height: 0%;"></div>
+</div>
+     
+         <script src="masonry.pkgd.min.js"></script>
+         <script src="imagesloaded.pkgd.min.js"></script>
+     
+         <script>
+             let allMediaFiles = [];
+             let MEDIA_DATA = {};
+             let FOLDER_MAP = {};
+             let allDirectories = [];
+             let masonry;
+             let loadedMediaCount = 0;
+             const filesPerLoad = 30;
+             let currentMediaIndex = -1;
+             let autoAdvanceInterval = null;
+             let isPlaying = false;
+             let viewedFiles = new Set();
+             let controlsHideTimer = null;
+             let currentRootPath = 'Loading...';
+             let globalVolume = 1.0;
+			 let slideshowShuffle = false;
+			 let viewMode = 'grid';
+			 let multiSelectMode = false;
+			 let selectedFiles = new Set();
+			 let favoriteFiles = new Set();
+			 let quickPreviewEnabled = true;
+			 let quickPreviewTimeout = null;
+			 let sequentialMode = true;
+			 let progressBarVisible = false;
+			 let videoPlayLimit = 5;
+			 let currentlyPlayingVideos = [];
+			 
+             
+             // Navigation History Variables
+             let navigationHistory = [];
+             let historyIndex = -1;
+     
+			function saveSettings() {
+				const settings = {
+					thumbWidth: document.getElementById('thumbnailWidth').value,
+					shuffle: document.getElementById('shuffleToggle').checked,
+					speed: document.getElementById('advanceTime').value,
+					slideshowShuffle: slideshowShuffle
+				};
+				localStorage.setItem('gallerySettings', JSON.stringify(settings));
+			}
+
+			// Update loadSettings function (replace lines 509-516)
+			function loadSettings() {
+				const saved = JSON.parse(localStorage.getItem('gallerySettings'));
+				if (saved) {
+					if (saved.thumbWidth) document.getElementById('thumbnailWidth').value = saved.thumbWidth;
+					if (saved.shuffle) document.getElementById('shuffleToggle').checked = saved.shuffle;
+					if (saved.speed) document.getElementById('advanceTime').value = saved.speed;
+					if (saved.slideshowShuffle !== undefined) {
+						slideshowShuffle = saved.slideshowShuffle;
+						updateShuffleButtonText();
+					}
+				}
+			}
+			// Load favorites from localStorage
+			function loadFavorites() {
+				const saved = localStorage.getItem('favoriteFiles');
+				if (saved) {
+					favoriteFiles = new Set(JSON.parse(saved));
+				}
+			}
+
+			function saveFavorites() {
+				localStorage.setItem('favoriteFiles', JSON.stringify(Array.from(favoriteFiles)));
+			}
+
+			// Update saveSettings to include new options
+			function saveSettings() {
+				const settings = {
+					thumbWidth: document.getElementById('thumbnailWidth').value,
+					shuffle: document.getElementById('shuffleToggle').checked,
+					speed: document.getElementById('advanceTime').value,
+					slideshowShuffle: slideshowShuffle,
+					quickPreview: document.getElementById('quickPreviewToggle').checked,
+					viewMode: viewMode,
+					sequentialMode: sequentialMode
+				};
+				localStorage.setItem('gallerySettings', JSON.stringify(settings));
+			}
+
+			// Update loadSettings
+			function loadSettings() {
+				const saved = JSON.parse(localStorage.getItem('gallerySettings'));
+				if (saved) {
+					if (saved.thumbWidth) document.getElementById('thumbnailWidth').value = saved.thumbWidth;
+					if (saved.shuffle) document.getElementById('shuffleToggle').checked = saved.shuffle;
+					if (saved.speed) document.getElementById('advanceTime').value = saved.speed;
+					if (saved.slideshowShuffle !== undefined) {
+						slideshowShuffle = saved.slideshowShuffle;
+						updateShuffleButtonText();
+					}
+					if (saved.quickPreview !== undefined) {
+						quickPreviewEnabled = saved.quickPreview;
+						document.getElementById('quickPreviewToggle').checked = saved.quickPreview;
+					}
+					if (saved.viewMode) {
+						viewMode = saved.viewMode;
+					}
+					if (saved.sequentialMode !== undefined) {
+						sequentialMode = saved.sequentialMode;
+					}
+				}
+				loadFavorites();
+			}
+
+			// View Mode Functions
+			function setViewMode(mode) {
+				viewMode = mode;
+				document.getElementById('gridViewBtn').classList.toggle('active', mode === 'grid');
+				document.getElementById('listViewBtn').classList.toggle('active', mode === 'list');
+				saveSettings();
+				refreshGalleryView();
+			}
+
+			function refreshGalleryView() {
+				const grid = document.querySelector('.grid');
+				const folderName = document.getElementById('folderFilter').value;
+				
+				if (viewMode === 'list') {
+					grid.classList.add('list-view');
+					grid.classList.remove('masonry-grid');
+					if (masonry) {
+						masonry.destroy();
+						masonry = null;
+					}
+				} else {
+					grid.classList.remove('list-view');
+					grid.classList.add('masonry-grid');
+				}
+				
+				filterGalleryByFolder(false);
+			}
+
+			// Multi-Select Functions
+			function toggleMultiSelect() {
+				multiSelectMode = document.getElementById('multiSelectToggle').checked;
+				selectedFiles.clear();
+				updateSelectedCount();
+				
+				document.querySelectorAll('.grid-item-checkbox').forEach(cb => {
+					cb.style.display = multiSelectMode ? 'block' : 'none';
+				});
+			}
+
+			function toggleFileSelection(fileName, checkbox) {
+				if (checkbox.checked) {
+					selectedFiles.add(fileName);
+				} else {
+					selectedFiles.delete(fileName);
+				}
+				updateSelectedCount();
+			}
+
+			function updateSelectedCount() {
+				const count = selectedFiles.size;
+				document.getElementById('selectedCount').textContent = count;
+				document.getElementById('deleteBtn').style.display = count > 0 ? 'inline-block' : 'none';
+			}
+
+			function deleteSelected() {
+				if (selectedFiles.size === 0) return;
+				
+				const confirmed = confirm(`Are you sure you want to delete ${selectedFiles.size} file(s)?\n\nThis action cannot be undone!`);
+				if (!confirmed) return;
+				
+				// Call delete API for each file
+				const deletePromises = Array.from(selectedFiles).map(fileName => {
+					return fetch('/api/delete', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({ path: fileName })
+					});
+				});
+				
+				Promise.all(deletePromises)
+					.then(() => {
+						alert(`Deleted ${selectedFiles.size} file(s)`);
+						selectedFiles.clear();
+						initializeGallery();
+					})
+					.catch(err => {
+						alert('Error deleting files: ' + err.message);
+					});
+			}
+
+			// Favorite Functions
+			function toggleFavorite(fileName, event) {
+				event.stopPropagation();
+				if (favoriteFiles.has(fileName)) {
+					favoriteFiles.delete(fileName);
+				} else {
+					favoriteFiles.add(fileName);
+				}
+				saveFavorites();
+				
+				// Update star appearance
+				const star = event.currentTarget;
+				star.classList.toggle('is-favorite');
+				star.textContent = favoriteFiles.has(fileName) ? '★' : '☆';
+			}
+
+			function filterFavorites() {
+				const select = document.getElementById('folderFilter');
+				if (select.value === '__favorites__') {
+					select.value = 'all';
+					filterGalleryByFolder(true);
+				} else {
+					allMediaFiles = Array.from(favoriteFiles).filter(f => MEDIA_DATA[f]);
+					loadedMediaCount = 0;
+					const grid = document.querySelector('.grid');
+					if (masonry) {
+						masonry.destroy();
+						masonry = null;
+					}
+					grid.innerHTML = '';
+					updateFileCounter();
+					loadMoreMedia();
+				}
+			}
+
+			// Quick Preview Functions
+			function showQuickPreview(fileName) {
+				if (!quickPreviewEnabled) return;
+				
+				clearTimeout(quickPreviewTimeout);
+				quickPreviewTimeout = setTimeout(() => {
+					const mediaInfo = MEDIA_DATA[fileName];
+					if (!mediaInfo) return;
+					
+					let overlay = document.getElementById('quickPreviewOverlay');
+					if (!overlay) {
+						overlay = document.createElement('div');
+						overlay.id = 'quickPreviewOverlay';
+						overlay.className = 'quick-preview-overlay';
+						document.body.appendChild(overlay);
+					}
+					
+					const mediaEl = mediaInfo.isVideo 
+						? `<video src="${mediaInfo.url}" autoplay muted loop style="max-width: 100%; max-height: 60vh;"></video>`
+						: `<img src="${mediaInfo.url}" style="max-width: 100%; max-height: 60vh;">`;
+					
+					overlay.innerHTML = `
+						${mediaEl}
+						<div class="quick-preview-info">
+							<strong>${mediaInfo.name}</strong><br>
+							<span style="color: #888;">${getFileExtension(mediaInfo.name)}</span>
+						</div>
+					`;
+					overlay.style.display = 'block';
+				}, 300);
+			}
+
+			function hideQuickPreview() {
+				clearTimeout(quickPreviewTimeout);
+				const overlay = document.getElementById('quickPreviewOverlay');
+				if (overlay) {
+					overlay.style.display = 'none';
+					overlay.innerHTML = '';
+				}
+			}
+
+			// Video Play Limiting (Fix for #7)
+			function manageVideoPlayback() {
+				const videos = document.querySelectorAll('.grid video');
+				const visibleVideos = Array.from(videos).filter(video => {
+					const rect = video.getBoundingClientRect();
+					return rect.top < window.innerHeight && rect.bottom > 0;
+				});
+				
+				// Pause all videos not in view
+				videos.forEach(v => {
+					if (!visibleVideos.includes(v)) {
+						v.pause();
+					}
+				});
+				
+				// Play only the first N visible videos
+				currentlyPlayingVideos = visibleVideos.slice(0, videoPlayLimit);
+				currentlyPlayingVideos.forEach(v => {
+					if (v.paused) v.play().catch(() => {});
+				});
+				
+				// Pause the rest
+				visibleVideos.slice(videoPlayLimit).forEach(v => v.pause());
+			}
+
+			// Call this on scroll
+			let videoScrollTimeout;
+			window.addEventListener('scroll', () => {
+				clearTimeout(videoScrollTimeout);
+				videoScrollTimeout = setTimeout(manageVideoPlayback, 100);
+			});
+						
+			
+     
+             function updateFileCounter() {
+                 const total = allMediaFiles.length;
+                 const loaded = Math.min(loadedMediaCount, total);
+                 document.getElementById('fileCounter').textContent = `${total} files`;
+                 document.getElementById('loadedCount').textContent = loaded;
+                 document.getElementById('totalCount').textContent = total;
+             }
+     
+             async function updateRootPathDisplay() {
+                 try {
+                     const response = await fetch('/api/root_dir');
+                     if (response.ok) {
+                         const data = await response.json();
+                         currentRootPath = data.root_dir;
+                         document.getElementById('folderName').textContent = currentRootPath;
+                         document.getElementById('currentFolder').title = 'Current Root: ' + currentRootPath;
+                     } else {
+                         document.getElementById('folderName').textContent = 'Root Path Error';
+                     }
+                 } catch (e) {
+                     console.error("Failed to fetch root directory:", e);
+                     document.getElementById('folderName').textContent = 'API Error';
+                 }
+             }
+             
+             async function openExplorer() {
+                 try {
+                     const response = await fetch('/api/open_explorer');
+                     if (!response.ok) {
+                         console.error('Failed to open explorer via API:', response.statusText);
+                         alert('Failed to open folder. Please open manually.');
+                     }
+                 } catch (e) {
+                     console.error("Error calling open_explorer API:", e);
+                     alert('Connection error.');
+                 }
+             }
+     
+             async function initializeGallery() {
+                 const grid = document.querySelector('.grid');
+                 grid.innerHTML = '<div class="loading">Loading media files</div>';
+                 
+                 loadSettings();
+                 
+                 // Reset History on full reload
+                 navigationHistory = [];
+                 historyIndex = -1;
+                 updateNavigationButtons();
+     
+                 await updateRootPathDisplay();
+                 
+                 try {
+                     const response = await fetch('/api/files');
+                     if (!response.ok) {
+                         throw new Error(`HTTP ${response.status}: Could not load file list`);
+                     }
+                     
+                     const apiData = await response.json();
+                     const fileList = apiData.files || [];
+                     allDirectories = apiData.directories || [];
+     
+                     if (fileList.length === 0 && allDirectories.length === 0) {
+                         grid.innerHTML = '<div class="loading">No media files or folders found</div>';
+                         return;
+                     }
+                     
+                     FOLDER_MAP = { 'all': [] };
+                     MEDIA_DATA = {};
+                     
+                     // Process directories
+                     allDirectories.forEach(folderName => {
+                         if (!FOLDER_MAP[folderName]) {
+                             FOLDER_MAP[folderName] = [];
+                         }
+                     });
+                     
+                     // Process files
+                     fileList.forEach((fileInfo) => {
+                         const relativePath = fileInfo.path;
+                         // FIX: URL Encoding for paths with # or special chars
+                         const webUrl = '/media/' + relativePath.split('/').map(encodeURIComponent).join('/');
+                         
+                         MEDIA_DATA[relativePath] = {
+                             url: webUrl,
+                             name: fileInfo.name,
+                             isVideo: fileInfo.isVideo
+                         };
+                         FOLDER_MAP['all'].push(relativePath);
+                         
+                         const parts = relativePath.split('/');
+                         if (parts.length > 1) {
+                             const folderName = parts.slice(0, -1).join('/');
+                             if (!FOLDER_MAP[folderName]) {
+                                 FOLDER_MAP[folderName] = [];
+                             }
+                             FOLDER_MAP[folderName].push(relativePath);
+                         }
+                     });
+                     
+                     populateFolderFilter();
+                     filterGalleryByFolder(true); // Record initial state
+                     
+                 } catch (error) {
+                     console.error('Error:', error);
+                     grid.innerHTML = `<div class="loading">Error: ${error.message}</div>`;
+                 }
+             }
+     
+             function populateFolderFilter() {
+                 const select = document.getElementById('folderFilter');
+                 select.innerHTML = '<option value="all">All Files</option>';
+                 
+                 Object.keys(FOLDER_MAP).sort().forEach(folderName => {
+                     if (folderName === 'all') return;
+                     const option = document.createElement('option');
+                     option.value = folderName;
+                     const depth = (folderName.match(/\//g) || []).length;
+                     option.textContent = '  '.repeat(depth) + folderName + ` (${FOLDER_MAP[folderName].length})`;
+                     select.appendChild(option);
+                 });
+             }
+     
+             function updateNavigationButtons() {
+                 document.getElementById('navBackBtn').disabled = historyIndex <= 0;
+                 document.getElementById('navForwardBtn').disabled = historyIndex >= navigationHistory.length - 1;
+             }
+     
+             function navigateBack() {
+                 if (historyIndex > 0) {
+                     historyIndex--;
+                     const folder = navigationHistory[historyIndex];
+                     document.getElementById('folderFilter').value = folder;
+                     filterGalleryByFolder(false);
+                 }
+             }
+     
+             function navigateForward() {
+                 if (historyIndex < navigationHistory.length - 1) {
+                     historyIndex++;
+                     const folder = navigationHistory[historyIndex];
+                     document.getElementById('folderFilter').value = folder;
+                     filterGalleryByFolder(false);
+                 }
+             }
+     
+             function navigateRoot() {
+                 document.getElementById('folderFilter').value = 'all';
+                 filterGalleryByFolder(true);
+             }
+     
+             function filterGalleryByFolder(recordHistory = true) {
+                 const select = document.getElementById('folderFilter');
+                 const folderName = select.value;
+                 const grid = document.querySelector('.grid');
+                 const shuffleEnabled = document.getElementById('shuffleToggle').checked;
+                 const thumbnailWidth = document.getElementById('thumbnailWidth').value;
+                 
+                 // History Logic
+                 if (recordHistory) {
+                     if (historyIndex === -1 || navigationHistory[historyIndex] !== folderName) {
+                         // Truncate forward history if we diverge
+                         navigationHistory = navigationHistory.slice(0, historyIndex + 1);
+                         navigationHistory.push(folderName);
+                         historyIndex++;
+                     }
+                 }
+                 updateNavigationButtons();
+     
+                 if (masonry) {
+                     masonry.destroy();
+                     masonry = null;
+                 }
+     
+     			grid.innerHTML = '';
+                 
+                 // --- Folder Navigation Cards ---
+                 const currentPrefix = folderName === 'all' ? '' : folderName + '/';
+                 const subfolders = allDirectories.filter(dir => {
+                     if (folderName === 'all') {
+                         return !dir.includes('/'); 
+                     }
+                     return dir.startsWith(currentPrefix) && 
+                            dir.slice(currentPrefix.length).indexOf('/') === -1 &&
+                            dir !== folderName;
+                 });
+     
+                 if (subfolders.length > 0) {
+                     const folderElements = subfolders.map(subDir => {
+                         const card = document.createElement('div');
+                         card.className = 'grid-item folder-card';
+                         card.style.width = `${thumbnailWidth}px`;
+                         
+                         const displayName = subDir.split('/').pop();
+                         card.innerHTML = `
+                             <div class="folder-icon">📁</div>
+                             <div class="item-name">${displayName}</div>
+                         `;
+                         card.onclick = () => {
+                             select.value = subDir;
+                             filterGalleryByFolder(true);
+                         };
+                         return card;
+                     });
+                     grid.append(...folderElements);
+                 }
+                 // ------------------------------------
+     
+                 let filesToShow = FOLDER_MAP[folderName] || [];
+                 let displayList = [...filesToShow];
+                 
+                 if (shuffleEnabled) {
+                     shuffleArray(displayList);
+                 }
+                 
+                 allMediaFiles = displayList;
+                 loadedMediaCount = 0;
+                 updateFileCounter();
+                 loadMoreMedia();
+                 saveSettings();
+             }
+     
+             function shuffleArray(array) {
+                 const unviewed = array.filter(file => !viewedFiles.has(file));
+                 const viewed = array.filter(file => viewedFiles.has(file));
+                 
+                 for (let i = unviewed.length - 1; i > 0; i--) {
+                     const j = Math.floor(Math.random() * (i + 1));
+                     [unviewed[i], unviewed[j]] = [unviewed[j], unviewed[i]];
+                 }
+                 
+                 for (let i = viewed.length - 1; i > 0; i--) {
+                     const j = Math.floor(Math.random() * (i + 1));
+                     [viewed[i], viewed[j]] = [viewed[j], viewed[i]];
+                 }
+                 
+                 array.length = 0;
+                 array.push(...unviewed, ...viewed);
+             }
+     
+             function forceReshuffle() {
+                 filterGalleryByFolder(false); // Don't record history for reshuffle
+             }
+     
+             function resetViewed() {
+                 viewedFiles.clear();
+                 filterGalleryByFolder(false);
+             }
+     
+             function scrollToTop() {
+                 const overlay = document.getElementById('fullscreenOverlay');
+                 if (overlay.classList.contains('visible')) {
+                     closeFullscreen();
+                 }
+                 window.scrollTo({ top: 0, behavior: 'smooth' });
+             }
+			 
+			 function toggleShuffleInSlideshow() {
+					slideshowShuffle = !slideshowShuffle;
+					updateShuffleButtonText();
+					saveSettings();
+				}
+
+			 function updateShuffleButtonText() {
+					const btn = document.getElementById('toggleShuffleBtn');
+					if (btn) {
+						btn.textContent = slideshowShuffle ? '🔀 Shuffle: ON' : '🔀 Shuffle: OFF';
+						if (slideshowShuffle) {
+							btn.classList.add('active');
+						} else {
+							btn.classList.remove('active');
+						}
+					}
+				}
+
+			 function returnToRootFromFullscreen() {
+					closeFullscreen();
+					navigateRoot();
+				}
+			 
+			 
+			 
+     
+             function getFileExtension(fileName) {
+                 const parts = fileName.split('.');
+                 return parts.length > 1 ? parts[parts.length - 1].toUpperCase() : 'FILE';
+             }
+     
+             function createMediaElement(fileName) {
+                 const mediaInfo = MEDIA_DATA[fileName];
+                 const isVideo = mediaInfo.isVideo;
+                 let mediaElement;
+     
+                 if (isVideo) {
+                     mediaElement = document.createElement('video');
+                     mediaElement.autoplay = false;
+                     mediaElement.muted = true;
+                     mediaElement.loop = true;
+                     mediaElement.preload = 'metadata';
+                 } else {
+                     mediaElement = document.createElement('img');
+                     mediaElement.loading = 'lazy';
+                 }
+     
+                 mediaElement.src = mediaInfo.url;
+                 return mediaElement;
+             }
+     
+             function initializeMasonry() {
+                 const grid = document.querySelector('.grid');
+                 if (masonry) masonry.destroy();
+                 
+                 masonry = new Masonry(grid, {
+                     itemSelector: '.grid-item',
+                     columnWidth: parseInt(document.getElementById('thumbnailWidth').value),
+                     gutter: 15,
+                     fitWidth: true
+                 });
+             }
+     
+             function appendMediaToGrid(files) {
+				const grid = document.querySelector('.grid');
+				if (files.length === 0) {
+					if (!masonry && grid.children.length > 0 && viewMode === 'grid') initializeMasonry();
+					return;
+				}
+				
+				const thumbnailWidth = document.getElementById('thumbnailWidth').value;
+
+				const elements = files.map((fileName) => {
+					const mediaInfo = MEDIA_DATA[fileName];
+					const isFavorite = favoriteFiles.has(fileName);
+					
+					if (viewMode === 'list') {
+						// List View
+						const listItem = document.createElement('div');
+						listItem.className = 'list-item';
+						listItem.onclick = () => openFullscreen(fileName);
+						
+						const thumbnail = createMediaElement(fileName);
+						thumbnail.className = 'list-item-thumbnail';
+						
+						listItem.innerHTML = `
+							${multiSelectMode ? `<input type="checkbox" class="grid-item-checkbox" onchange="toggleFileSelection('${fileName}', this)">` : ''}
+							<div class="list-item-info">
+								<div class="list-item-name">${mediaInfo.name}</div>
+								<div class="list-item-meta">${getFileExtension(mediaInfo.name)} • ${mediaInfo.isVideo ? 'Video' : 'Image'}</div>
+							</div>
+							<div class="favorite-star ${isFavorite ? 'is-favorite' : ''}" onclick="toggleFavorite('${fileName}', event)">
+								${isFavorite ? '★' : '☆'}
+							</div>
+						`;
+						
+						listItem.insertBefore(thumbnail, listItem.children[multiSelectMode ? 1 : 0]);
+						return listItem;
+					} else {
+						// Grid View
+						const gridItem = document.createElement('div');
+						gridItem.classList.add('grid-item');
+						gridItem.style.width = `${thumbnailWidth}px`;
+						
+						if (multiSelectMode) {
+							const checkbox = document.createElement('input');
+							checkbox.type = 'checkbox';
+							checkbox.className = 'grid-item-checkbox';
+							checkbox.onchange = (e) => toggleFileSelection(fileName, e.target);
+							gridItem.appendChild(checkbox);
+						}
+						
+						const star = document.createElement('div');
+						star.className = `favorite-star ${isFavorite ? 'is-favorite' : ''}`;
+						star.textContent = isFavorite ? '★' : '☆';
+						star.onclick = (e) => toggleFavorite(fileName, e);
+						gridItem.appendChild(star);
+						
+						gridItem.appendChild(createMediaElement(fileName));
+						
+						const infoDiv = document.createElement('div');
+						infoDiv.className = 'item-info';
+						infoDiv.innerHTML = `
+							<div class="item-name" title="${mediaInfo.name}">${mediaInfo.name}</div>
+							<div class="item-type">${getFileExtension(mediaInfo.name)} • ${mediaInfo.isVideo ? 'Video' : 'Image'}</div>
+						`;
+						gridItem.appendChild(infoDiv);
+						
+						gridItem.addEventListener('click', () => openFullscreen(fileName));
+						gridItem.addEventListener('mouseenter', () => showQuickPreview(fileName));
+						gridItem.addEventListener('mouseleave', hideQuickPreview);
+						
+						return gridItem;
+					}
+				});
+
+				grid.append(...elements);
+
+				if (viewMode === 'grid') {
+					if (masonry) {
+						masonry.appended(elements);
+						imagesLoaded(elements, () => masonry.layout());
+					} else {
+						imagesLoaded(elements, () => {
+							if (!masonry) {
+								initializeMasonry();
+								setTimeout(() => masonry && masonry.layout(), 50);
+							}
+						});
+					}
+				}
+				
+				setTimeout(manageVideoPlayback, 500);
+				updateFileCounter();
+			}
+     
+             function loadMoreMedia() {
+                 const nextBatch = allMediaFiles.slice(loadedMediaCount, loadedMediaCount + filesPerLoad);
+                 if (nextBatch.length > 0) {
+                     appendMediaToGrid(nextBatch);
+                     loadedMediaCount += nextBatch.length;
+                 }
+             }
+     
+             function openFullscreen(fileName) {
+                 const overlay = document.getElementById('fullscreenOverlay');
+                 const content = document.querySelector('.fullscreen-content');
+                 
+                 currentMediaIndex = allMediaFiles.indexOf(fileName);
+                 if (currentMediaIndex === -1) return;
+                 
+                 viewedFiles.add(fileName);
+                 
+                 const mediaInfo = MEDIA_DATA[fileName];
+                 const isVideo = mediaInfo.isVideo;
+                 content.innerHTML = '';
+     
+                 let mediaElement;
+                 if (isVideo) {
+                     mediaElement = document.createElement('video');
+                     mediaElement.controls = true; 
+                     mediaElement.autoplay = true;
+                     mediaElement.loop = true;
+                     mediaElement.volume = globalVolume; 
+                     mediaElement.onvolumechange = (e) => globalVolume = e.target.volume;
+                 } else {
+                     mediaElement = document.createElement('img');
+                 }
+     
+                 mediaElement.src = mediaInfo.url;
+                 content.appendChild(mediaElement);
+     
+                 updateFullscreenInfo(fileName);
+				 updateShuffleButtonText();
+                 overlay.classList.add('visible');
+                 resetControlsTimer();
+             }
+     
+             function updateFullscreenInfo(fileName) {
+                 const mediaInfo = MEDIA_DATA[fileName];
+                 const infoDiv = document.getElementById('mediaInfo');
+                 
+                 infoDiv.querySelector('.media-counter').textContent = `${currentMediaIndex + 1} / ${allMediaFiles.length}`;
+                 infoDiv.querySelector('.media-filename').textContent = mediaInfo.name;
+                 infoDiv.querySelector('.media-filetype').textContent = `${getFileExtension(mediaInfo.name)} • ${mediaInfo.isVideo ? 'Video' : 'Image'}`;
+                 
+                 document.getElementById('prevBtn').disabled = currentMediaIndex <= 0;
+                 document.getElementById('nextBtn').disabled = currentMediaIndex >= allMediaFiles.length - 1;
+             }
+     
+			 function toggleSequentialMode() {
+				sequentialMode = !sequentialMode;
+				document.getElementById('modeText').textContent = sequentialMode ? 'Sequential' : 'Random';
+				document.getElementById('sequentialModeBtn').classList.toggle('active');
+				saveSettings();
+			}
+
+	 
+	 
+	 
+             function navigateFullscreen(direction) {
+				let newIndex;
+				
+				if (!sequentialMode && direction > 0) {
+					// Random mode: pick random unviewed file
+					const unviewed = allMediaFiles.filter((file, idx) => 
+						idx !== currentMediaIndex && !viewedFiles.has(file)
+					);
+					
+					if (unviewed.length > 0) {
+						const randomFile = unviewed[Math.floor(Math.random() * unviewed.length)];
+						newIndex = allMediaFiles.indexOf(randomFile);
+					} else {
+						// All viewed, pick any random
+						const others = allMediaFiles.filter((_, idx) => idx !== currentMediaIndex);
+						const randomFile = others[Math.floor(Math.random() * others.length)];
+						newIndex = allMediaFiles.indexOf(randomFile);
+					}
+				} else {
+					newIndex = currentMediaIndex + direction;
+				}
+				
+				if (newIndex >= 0 && newIndex < allMediaFiles.length) {
+					currentMediaIndex = newIndex;
+					openFullscreen(allMediaFiles[currentMediaIndex]);
+				} else if (newIndex >= allMediaFiles.length) {
+					stopAutoAdvance();
+				}
+			}
+
+			// Update progress bar during slideshow
+			function updateProgressBar() {
+				if (!isPlaying) {
+					document.getElementById('verticalProgress').style.display = 'none';
+					return;
+				}
+				
+				document.getElementById('verticalProgress').style.display = 'block';
+				const delay = parseInt(document.getElementById('advanceTime').value);
+				const progressPercent = ((currentMediaIndex + 1) / allMediaFiles.length) * 100;
+				document.getElementById('progressFill').style.height = progressPercent + '%';
+			}
+
+			// Call updateProgressBar when opening fullscreen
+			// Add to openFullscreen function after line 894:
+			updateProgressBar();
+     
+             function closeFullscreen() {
+                 document.getElementById('fullscreenOverlay').classList.remove('visible');
+                 stopAutoAdvance();
+                 currentMediaIndex = -1;
+                 const content = document.querySelector('.fullscreen-content');
+                 content.innerHTML = ''; 
+             }
+     
+             function resetControlsTimer() {
+                 const controls = document.getElementById('playbackControls');
+                 controls.classList.remove('auto-hide');
+                 clearTimeout(controlsHideTimer);
+                 controlsHideTimer = setTimeout(() => {
+                     if (isPlaying) controls.classList.add('auto-hide');
+                 }, 3000);
+             }
+     
+             function startAutoAdvance() {
+                 stopAutoAdvance();
+                 let delay = parseInt(document.getElementById('advanceTime').value);
+                 if (isNaN(delay) || delay < 500) {
+                     delay = 500;
+                     document.getElementById('advanceTime').value = 500;
+                 }
+     
+                 autoAdvanceInterval = setInterval(() => {
+                     if (currentMediaIndex < allMediaFiles.length - 1) {
+                         navigateFullscreen(1);
+                     } else {
+                         stopAutoAdvance();
+                     }
+                 }, delay);
+                 isPlaying = true;
+                 document.getElementById('playPauseBtn').textContent = '⏸ Pause';
+                 document.getElementById('playPauseBtn').classList.add('active');
+             }
+     
+             function stopAutoAdvance() {
+                 if (autoAdvanceInterval) {
+                     clearInterval(autoAdvanceInterval);
+                     autoAdvanceInterval = null;
+                 }
+                 isPlaying = false;
+                 document.getElementById('playPauseBtn').textContent = '▶ Play';
+                 document.getElementById('playPauseBtn').classList.remove('active');
+             }
+     
+             // Event Listeners
+             document.getElementById('thumbnailWidth').addEventListener('input', (e) => {
+                 const newWidth = parseInt(e.target.value);
+                 document.querySelectorAll('.grid-item').forEach(item => {
+                     item.style.width = `${newWidth}px`;
+                 });
+                 if (masonry) {
+                     masonry.options.columnWidth = newWidth;
+                     masonry.layout();
+                 }
+             });
+     
+             document.querySelector('.close-btn').addEventListener('click', closeFullscreen);
+             document.getElementById('prevBtn').addEventListener('click', () => navigateFullscreen(-1));
+             document.getElementById('nextBtn').addEventListener('click', () => navigateFullscreen(1));
+             document.getElementById('playPauseBtn').addEventListener('click', () => {
+                 isPlaying ? stopAutoAdvance() : startAutoAdvance();
+             });
+     
+             document.addEventListener('keydown', (e) => {
+                 const overlay = document.getElementById('fullscreenOverlay');
+                 if (!overlay.classList.contains('visible')) return;
+                 
+                 if (e.key === 'ArrowRight' || e.key === 'd') navigateFullscreen(1);
+                 else if (e.key === 'ArrowLeft' || e.key === 'a') navigateFullscreen(-1);
+                 else if (e.key === 'Escape') closeFullscreen();
+                 else if (e.key === ' ') {
+                     e.preventDefault();
+                     isPlaying ? stopAutoAdvance() : startAutoAdvance();
+                 }
+             });
+     
+             document.getElementById('fullscreenOverlay').addEventListener('mousedown', (e) => {
+                 if (e.target.closest('.close-btn, .playback-controls, .nav-btn')) return;
+                 if (e.target.tagName === 'VIDEO') return;
+                 
+                 e.preventDefault();
+                 if (e.button === 0 && currentMediaIndex < allMediaFiles.length - 1) {
+                     navigateFullscreen(1);
+                 }
+             });
+     
+             document.getElementById('fullscreenOverlay').addEventListener('contextmenu', (e) => {
+                 if (e.target.tagName === 'VIDEO') return;
+                 e.preventDefault();
+                 if (currentMediaIndex > 0) navigateFullscreen(-1);
+             });
+     
+             document.getElementById('fullscreenOverlay').addEventListener('mousemove', resetControlsTimer);
+     
+             window.addEventListener('scroll', () => {
+                 if ((window.innerHeight + window.scrollY) >= (document.body.offsetHeight - 500) &&
+                     loadedMediaCount < allMediaFiles.length) {
+                     loadMoreMedia();
+                 }
+             });
+     
+             window.addEventListener('DOMContentLoaded', initializeGallery);
+         </script>
+     </body>
+     </html>
+     
