@@ -463,6 +463,7 @@
     <script src="imagesloaded.pkgd.min.js"></script>
 
     <script>
+		let globalVolume = 1.0;
         let allMediaFiles = [];
         let MEDIA_DATA = {};
         let FOLDER_MAP = {};
@@ -568,7 +569,16 @@
                         FOLDER_MAP[folderName].push(relativePath);
                     }
                 });
-                
+ 
+			const saved = JSON.parse(localStorage.getItem('gallerySettings'));
+				if (saved) {
+    				if (saved.thumbWidth) {
+        					document.getElementById('thumbnailWidth').value = saved.thumbWidth;
+        			// ... update grid item CSS width here ...
+    			}
+					if (saved.shuffle) document.getElementById('shuffleToggle').checked = saved.shuffle;
+    				if (saved.speed) document.getElementById('advanceTime').value = saved.speed;
+			}
                 populateFolderFilter();
                 filterGalleryByFolder();
                 
@@ -673,6 +683,16 @@
         function forceReshuffle() {
             filterGalleryByFolder();
         }
+
+		function saveSettings() {
+ 		   const settings = {
+        	thumbWidth: document.getElementById('thumbnailWidth').value,
+        	shuffle: document.getElementById('shuffleToggle').checked,
+        	speed: document.getElementById('advanceTime').value,
+        	lastFolder: document.getElementById('folderFilter').value
+    	};
+    		localStorage.setItem('gallerySettings', JSON.stringify(settings));
+	}
 
         function resetViewed() {
             viewedFiles.clear();
@@ -794,6 +814,8 @@
             let mediaElement;
             if (isVideo) {
                 mediaElement = document.createElement('video');
+				mediaElement.volume = globalVolume;
+				mediaElement.onvolumechange = (e) => globalVolume = e.target.volume;
                 mediaElement.controls = true; // Ensure native controls work
                 mediaElement.autoplay = true;
                 mediaElement.loop = true;
