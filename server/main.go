@@ -30,6 +30,11 @@ var (
 	BuildTime = "unknown"
 )
 
+type ApiResponse struct {
+    Files       []FileInfo `json:"files"`
+    Directories []string   `json:"directories"`
+}
+
 type FileInfo struct {
 	Path     string `json:"path"`
 	Name     string `json:"name"`
@@ -114,11 +119,17 @@ func setupRoutes(mediaDir string) {
 
 	// API endpoint for file list (with details)
 	http.HandleFunc("/api/files", func(w http.ResponseWriter, r *http.Request) {
-		files, err := getDetailedFileList(mediaDir)
+		 files, directories, err := getDetailedFileListAndFolders(mediaDir)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
+		response := ApiResponse{
+        Files:       files,
+        Directories: directories,
+			}
+		
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(files)
 	})
@@ -133,34 +144,53 @@ func setupRoutes(mediaDir string) {
 	})
 }
 
-func getDetailedFileList(dir string) ([]FileInfo, error) {
-	extensions := map[string]bool{
-		".jpg": false, ".jpeg": false, ".png": false, ".webp": false,
-		".gif": false, ".mp4": true, ".webm": true, ".ogg": true,
-		".bmp": false, ".svg": false, ".mov": true, ".avi": true,
-	}
+func getDetailedFileListAndFolders(dir string) ([]FileInfo, []string, error) {
+    extensions := map[string]bool{
+        ".jpg": false, ".jpeg": false, ".png": false, ".webp": false,
+        ".gif": false, ".mp4": true, ".webm": true, ".ogg": true,
+        ".bmp": false, ".svg": false, ".mov": true, ".avi": true,
+    }
 
-	var files []FileInfo
-	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() || strings.HasPrefix(info.Name(), ".") {
-			return err
-		}
+    var files []FileInfo
+    var directories []string // New list for directories
+    
+    err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+        if err != nil {
+            return err
+        }
+        if strings.HasPrefix(info.Name(), ".") { // Skip hidden files/folders
+            if info.IsDir() {
+                return filepath.SkipDir // Don't descend into hidden folders
+            }
+            return nil
+        }
 
-		ext := strings.ToLower(filepath.Ext(path))
-		if isVideo, exists := extensions[ext]; exists {
-			relPath, _ := filepath.Rel(dir, path)
-			files = append(files, FileInfo{
-				Path:     filepath.ToSlash(relPath),
-				Name:     info.Name(),
-				Size:     info.Size(),
-				Modified: info.ModTime().Format(time.RFC3339),
-				IsVideo:  isVideo,
-			})
-		}
-		return nil
-	})
+        // If it's a directory, add its relative path to the list
+        if info.IsDir() {
+            // Don't add the root directory itself, only subdirectories
+            if path != dir {
+                relPath, _ := filepath.Rel(dir, path)
+                directories = append(directories, filepath.ToSlash(relPath))
+            }
+            return nil // Continue walking
+        }
 
-	return files, err
+        // Existing logic for processing files
+        ext := strings.ToLower(filepath.Ext(path))
+        if isVideo, exists := extensions[ext]; exists {
+            relPath, _ := filepath.Rel(dir, path)
+            files = append(files, FileInfo{
+                Path:     filepath.ToSlash(relPath),
+                Name:     info.Name(),
+                Size:     info.Size(),
+                Modified: info.ModTime().Format(time.RFC3339),
+                IsVideo:  isVideo,
+            })
+        }
+        return nil
+    })
+
+    return files, directories, err
 }
 
 func generateOrLoadCertificate() (tls.Certificate, error) {
