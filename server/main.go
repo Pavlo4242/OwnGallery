@@ -131,7 +131,7 @@ func setupRoutes(mediaDir string) {
 			}
 		
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(files)
+		json.NewEncoder(w).Encode(response)
 	})
 
 	// Health check endpoint
