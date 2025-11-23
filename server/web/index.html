@@ -622,12 +622,17 @@
             position: fixed;
             left: 0;
             top: 0;
-            width: 6px;
+            width: 10px; /* Wider for better clicking */
             height: 100vh;
-            background-color: rgba(0, 0, 0, 0.5);
-            z-index: 1001;
+            background-color: rgba(0, 0, 0, 0.3);
+            z-index: 1003;
             transition: opacity 0.3s;
-            display: none;
+            display: none; /* Toggled in JS */
+            cursor: pointer;
+        }
+        
+        .vertical-progress-bar:hover {
+            background-color: rgba(255, 255, 255, 0.1);
         }
 
         .vertical-progress-fill {
@@ -724,6 +729,26 @@
             border-radius: 15px;
             backdrop-filter: blur(5px);
             pointer-events: none;
+        }
+        
+        /* Fullscreen Folder Selector */
+        .fullscreen-folder-select {
+            position: absolute;
+            top: 30px;
+            right: 100px;
+            z-index: 1003;
+            background-color: rgba(0, 0, 0, 0.6);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 6px;
+            padding: 8px;
+            max-width: 200px;
+            backdrop-filter: blur(5px);
+        }
+        
+        .fullscreen-folder-select:hover {
+            background-color: rgba(0, 0, 0, 0.8);
+            border-color: #4CAF50;
         }
 
         .gallery-dir {
@@ -824,6 +849,10 @@
     
     <div id="fullscreenDir" class="fullscreen-dir"></div>
     
+    <select id="fullscreenFolderSelect" class="fullscreen-folder-select" onchange="jumpToFolderFromFullscreen(this.value)">
+        <option value="">Jump to Folder...</option>
+    </select>
+    
     <span class="close-btn" onclick="closeFullscreen()">&times;</span>
     <button class="nav-btn prev-btn" id="prevBtn">‹</button>
     <button class="nav-btn next-btn" id="nextBtn">›</button>
@@ -850,7 +879,7 @@
     </div>
     <button class="bottom-right-root" onclick="returnToRootFromFullscreen()">■ Return to Root</button>
     
-    <div id="verticalProgress" class="vertical-progress-bar">
+    <div id="verticalProgress" class="vertical-progress-bar" onclick="jumpToProgress(event)">
         <div class="vertical-progress-fill" id="progressFill"></div>
     </div>
 </div>
@@ -1052,7 +1081,7 @@
 
     function filterFavorites() {
         const select = document.getElementById('folderFilter');
-        select.value = 'all'; // Reset folder to all when showing favorites
+        select.value = 'all'; 
         
         allMediaFiles = Array.from(favoriteFiles).filter(f => MEDIA_DATA[f]);
         loadedMediaCount = 0;
@@ -1145,9 +1174,7 @@
                         img.src = img.dataset.src;
                     }
                 } else {
-                    // Unload WebP to stop background animation
                     if (img.src && img.dataset.src) {
-                        // Store height to prevent layout collapse
                         img.style.height = img.offsetHeight + 'px'; 
                         img.src = ''; 
                     }
@@ -1319,6 +1346,7 @@
             });
             
             populateFolderFilter();
+            populateFullscreenFolderSelect();
             filterGalleryByFolder(true);
             
         } catch (error) {
@@ -1329,6 +1357,9 @@
         
     function populateFolderFilter() {
         const select = document.getElementById('folderFilter');
+        // Save current selection if any
+        const currentVal = select.value;
+        
         select.innerHTML = '<option value="all">All Files</option>';
         
         Object.keys(FOLDER_MAP).sort().forEach(folderName => {
@@ -1336,9 +1367,41 @@
             const option = document.createElement('option');
             option.value = folderName;
             const depth = (folderName.match(/\//g) || []).length;
-            option.textContent = '  '.repeat(depth) + folderName + ` (${FOLDER_MAP[folderName].length})`;
+            
+            // Calculate viewed count
+            const filesInFolder = FOLDER_MAP[folderName];
+            const viewedCount = filesInFolder.filter(f => viewedFiles.has(f)).length;
+            
+            option.textContent = '  '.repeat(depth) + folderName + ` (${viewedCount}/${filesInFolder.length} viewed)`;
             select.appendChild(option);
         });
+        
+        // Restore selection if valid, else default to all
+        if (currentVal && FOLDER_MAP[currentVal]) {
+            select.value = currentVal;
+        }
+    }
+    
+    function populateFullscreenFolderSelect() {
+        const select = document.getElementById('fullscreenFolderSelect');
+        select.innerHTML = '<option value="">Jump to Folder...</option>';
+        
+        Object.keys(FOLDER_MAP).sort().forEach(folderName => {
+            if (folderName === 'all') return;
+            const option = document.createElement('option');
+            option.value = folderName;
+            const depth = (folderName.match(/\//g) || []).length;
+            option.textContent = '  '.repeat(depth) + folderName;
+            select.appendChild(option);
+        });
+    }
+    
+    function jumpToFolderFromFullscreen(folderName) {
+        if (!folderName) return;
+        document.getElementById('folderFilter').value = folderName;
+        closeFullscreen();
+        filterGalleryByFolder(true);
+        scrollToTop();
     }
 
     function updateNavigationButtons() {
@@ -1376,7 +1439,6 @@
         const shuffleEnabled = document.getElementById('shuffleToggle').checked;
         const thumbnailWidth = document.getElementById('thumbnailWidth').value;
         
-        // Update Gallery Directory Display
         const galleryDir = document.getElementById('galleryDir');
         galleryDir.textContent = folderName === 'all' ? 'Root' : folderName;
         
@@ -1396,7 +1458,6 @@
 
         grid.innerHTML = '';
         
-        // --- Folder Navigation Cards ---
         const currentPrefix = folderName === 'all' ? '' : folderName + '/';
         const subfolders = allDirectories.filter(dir => {
             if (folderName === 'all') return !dir.includes('/'); 
@@ -1425,12 +1486,10 @@
             grid.append(...folderElements);
         }
 
-        // --- Recursive File Gathering ---
         let displayList;
         if (folderName === 'all') {
             displayList = [...FOLDER_MAP['all']];
         } else {
-            // Show all files that start with folderName + '/' to include subdirectories recursively
             displayList = FOLDER_MAP['all'].filter(f => f.startsWith(folderName + '/'));
         }
         
@@ -1470,6 +1529,7 @@
     function resetViewed() {
         viewedFiles.clear();
         filterGalleryByFolder(false);
+        populateFolderFilter(); // Update counts
     }
 
     function scrollToTop() {
@@ -1519,7 +1579,6 @@
             mediaElement.loading = 'lazy';
             
             if (fileName.toLowerCase().endsWith('.webp')) {
-                // WebP Optimization: Use data-src and observe
                 mediaElement.dataset.src = mediaInfo.url;
                 mediaElement.classList.add('lazy-anim');
                 if (animObserver) animObserver.observe(mediaElement);
@@ -1668,7 +1727,6 @@
             appendMediaToGrid(nextBatch);
             loadedMediaCount += nextBatch.length;
         } else {
-            // Check if we need to add "Next Folder" button
             const currentFolder = document.getElementById('folderFilter').value;
             if (currentFolder !== 'all' && !document.getElementById('nextFolderCard')) {
                 addNextFolderCard(currentFolder);
@@ -1713,6 +1771,8 @@
         if (currentMediaIndex === -1) return;
         
         viewedFiles.add(fileName);
+        // Update counts in background (lazy way to ensure persistence)
+        populateFolderFilter(); 
         
         const mediaInfo = MEDIA_DATA[fileName];
         const isVideo = mediaInfo.isVideo;
@@ -1736,10 +1796,20 @@
 
         updateFullscreenInfo(fileName);
         
-        // Update Fullscreen Directory Display
         const dirParts = fileName.split('/');
         const dirPath = dirParts.length > 1 ? dirParts.slice(0, -1).join('/') : 'Root';
         document.getElementById('fullscreenDir').textContent = dirPath;
+        
+        // Update Fullscreen Folder Select if NOT auto-playing to avoid flickering distractions
+        if (!isPlaying) {
+             // Try to match the current directory
+             const fsSelect = document.getElementById('fullscreenFolderSelect');
+             if (FOLDER_MAP[dirPath]) {
+                 fsSelect.value = dirPath;
+             } else {
+                 fsSelect.value = "";
+             }
+        }
 
         updateShuffleButtonText();
         overlay.classList.add('visible');
@@ -1765,10 +1835,11 @@
         saveSettings();
     }
 
-    function navigateFullscreen(direction) {
+    function navigateFullscreen(direction, forceSequential = false) {
         let newIndex;
         
-        if (!sequentialMode && direction > 0) {
+        // Use random logic ONLY if NOT forced sequential AND in random mode AND moving forward
+        if (!forceSequential && !sequentialMode && direction > 0) {
             const unviewed = allMediaFiles.filter((file, idx) => idx !== currentMediaIndex && !viewedFiles.has(file));
             if (unviewed.length > 0) {
                 const randomFile = unviewed[Math.floor(Math.random() * unviewed.length)];
@@ -1794,14 +1865,24 @@
         const progressBar = document.getElementById('verticalProgress');
         const progressFill = document.getElementById('progressFill');
         
-        if (!isPlaying) {
-            progressBar.style.display = 'none';
-            return;
-        }
-        
+        // Ensure always displayed as requested
         progressBar.style.display = 'block';
         const progressPercent = ((currentMediaIndex + 1) / allMediaFiles.length) * 100;
         progressFill.style.height = progressPercent + '%';
+    }
+    
+    function jumpToProgress(e) {
+        e.stopPropagation(); // Prevent overlay click
+        const progressBar = document.getElementById('verticalProgress');
+        const rect = progressBar.getBoundingClientRect();
+        const clickY = e.clientY - rect.top;
+        const height = rect.height;
+        const percentage = clickY / height;
+        
+        let newIndex = Math.floor(percentage * allMediaFiles.length);
+        newIndex = Math.max(0, Math.min(newIndex, allMediaFiles.length - 1));
+        
+        openFullscreen(allMediaFiles[newIndex]);
     }
 
     function closeFullscreen() {
@@ -1851,7 +1932,6 @@
         isPlaying = false;
         document.getElementById('playPauseBtn').textContent = '▶ Play';
         document.getElementById('playPauseBtn').classList.remove('active');
-        document.getElementById('verticalProgress').style.display = 'none';
     }
 
     // --- Listeners ---
@@ -1892,9 +1972,11 @@
             closeFullscreen();
             return;
         }
-        if (e.target.closest('.close-btn, .playback-controls, .nav-btn, .bottom-right-root, .top-left-close')) return;
+        // Ignore click if it was on a control
+        if (e.target.closest('.close-btn, .playback-controls, .nav-btn, .bottom-right-root, .top-left-close, .fullscreen-folder-select, .vertical-progress-bar')) return;
         if (e.target.tagName === 'VIDEO') return;
         e.preventDefault();
+        // Left click (button 0) is Random/Sequential based on Mode
         if (e.button === 0 && currentMediaIndex < allMediaFiles.length - 1) {
             navigateFullscreen(1);
         }
@@ -1903,7 +1985,20 @@
     document.getElementById('fullscreenOverlay').addEventListener('contextmenu', (e) => {
         if (e.target.tagName === 'VIDEO') return;
         e.preventDefault();
-        if (currentMediaIndex > 0) navigateFullscreen(-1);
+        // Right click logic
+        if (isPlaying) {
+            stopAutoAdvance();
+        } else {
+            if (currentMediaIndex > 0) navigateFullscreen(-1, true); // Navigate Prev Sequential
+        }
+    });
+    
+    // Mouse Wheel Logic
+    document.getElementById('fullscreenOverlay').addEventListener('wheel', (e) => {
+        e.preventDefault();
+        // Force Sequential navigation on wheel
+        if (e.deltaY > 0) navigateFullscreen(1, true);
+        else if (e.deltaY < 0) navigateFullscreen(-1, true);
     });
 
     document.getElementById('fullscreenOverlay').addEventListener('mousemove', resetControlsTimer);
