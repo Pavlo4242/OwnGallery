@@ -76,6 +76,12 @@
             font-weight: 500;
         }
 
+        .nav-controls {
+            display: flex;
+            gap: 5px;
+            margin-left: 5px;
+        }
+
         .controls label {
             margin-right: 10px;
             color: #b0b0b0;
@@ -100,6 +106,11 @@
         .controls button:hover {
             background-color: #3a3a3a;
             border-color: #4a4a4a;
+        }
+
+        .controls button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
 
         .grid {
@@ -149,7 +160,7 @@
             cursor: pointer;
             color: #fff;
             font-size: 14px;
-            height: 150px; /* Fixed height for folder cards */
+            height: 150px;
         }
         .folder-card:hover {
             border-color: #4CAF50;
@@ -218,14 +229,12 @@
             box-sizing: border-box;
         }
 
-        /* UPDATED: Scaling for images/videos */
         .fullscreen-content img,
         .fullscreen-content video {
             width: 100%;
             height: 100%;
             object-fit: contain;
             border-radius: 8px;
-            /* Removed pointer-events: none to allow video interaction */
         }
 
         .nav-btn {
@@ -411,18 +420,23 @@
             </div>
             <button onclick="openExplorer()">📂 Open Folder in Explorer</button>
             <div class="file-counter" id="fileCounter">0 files</div>
+            <div class="nav-controls">
+                <button onclick="navigateBack()" id="navBackBtn" title="Go Back">←</button>
+                <button onclick="navigateRoot()" id="navRootBtn" title="Return to Root">■</button>
+                <button onclick="navigateForward()" id="navForwardBtn" title="Go Forward">→</button>
+            </div>
         </div>
         
         <div class="controls-center">
             <button onclick="initializeGallery()">🔄 Reload</button>
             <label for="thumbnailWidth">Size:</label>
-            <input type="range" id="thumbnailWidth" min="150" max="400" value="250">
+            <input type="range" id="thumbnailWidth" min="150" max="400" value="250" onchange="saveSettings()">
             <label for="folderFilter">Folder:</label>
             <select id="folderFilter" onchange="filterGalleryByFolder()">
                 <option value="all">All Files</option>
             </select>
             <label>
-                <input type="checkbox" id="shuffleToggle"> Shuffle
+                <input type="checkbox" id="shuffleToggle" onchange="saveSettings()"> Shuffle
             </label>
             <button onclick="forceReshuffle()">🔀 Re-shuffle</button>
             <button onclick="resetViewed()">↺ Reset Viewed</button>
@@ -452,8 +466,9 @@
             <button id="playPauseBtn">▶ Play</button>
             <div style="text-align: center;">
                 <label style="color: white; font-size: 11px;">Speed (ms)</label>
-                <input type="number" id="advanceTime" min="500" max="30000" step="100" value="500" 
-                       style="width: 100px; padding: 8px; border-radius: 8px; border: none; text-align: center; margin-top: 5px;">
+                <input type="number" id="advanceTime" min="500" max="30000" step="100" value="3000" 
+                       style="width: 100px; padding: 8px; border-radius: 8px; border: none; text-align: center; margin-top: 5px;"
+                       onchange="saveSettings()">
             </div>
             <button onclick="scrollToTop()">↑ Back to Top</button>
         </div>
@@ -463,7 +478,6 @@
     <script src="imagesloaded.pkgd.min.js"></script>
 
     <script>
-		let globalVolume = 1.0;
         let allMediaFiles = [];
         let MEDIA_DATA = {};
         let FOLDER_MAP = {};
@@ -477,6 +491,29 @@
         let viewedFiles = new Set();
         let controlsHideTimer = null;
         let currentRootPath = 'Loading...';
+        let globalVolume = 1.0;
+        
+        // Navigation History Variables
+        let navigationHistory = [];
+        let historyIndex = -1;
+
+        function saveSettings() {
+            const settings = {
+                thumbWidth: document.getElementById('thumbnailWidth').value,
+                shuffle: document.getElementById('shuffleToggle').checked,
+                speed: document.getElementById('advanceTime').value
+            };
+            localStorage.setItem('gallerySettings', JSON.stringify(settings));
+        }
+
+        function loadSettings() {
+            const saved = JSON.parse(localStorage.getItem('gallerySettings'));
+            if (saved) {
+                if (saved.thumbWidth) document.getElementById('thumbnailWidth').value = saved.thumbWidth;
+                if (saved.shuffle) document.getElementById('shuffleToggle').checked = saved.shuffle;
+                if (saved.speed) document.getElementById('advanceTime').value = saved.speed;
+            }
+        }
 
         function updateFileCounter() {
             const total = allMediaFiles.length;
@@ -520,6 +557,13 @@
             const grid = document.querySelector('.grid');
             grid.innerHTML = '<div class="loading">Loading media files</div>';
             
+            loadSettings();
+            
+            // Reset History on full reload
+            navigationHistory = [];
+            historyIndex = -1;
+            updateNavigationButtons();
+
             await updateRootPathDisplay();
             
             try {
@@ -569,18 +613,9 @@
                         FOLDER_MAP[folderName].push(relativePath);
                     }
                 });
- 
-			const saved = JSON.parse(localStorage.getItem('gallerySettings'));
-				if (saved) {
-    				if (saved.thumbWidth) {
-        					document.getElementById('thumbnailWidth').value = saved.thumbWidth;
-        			// ... update grid item CSS width here ...
-    			}
-					if (saved.shuffle) document.getElementById('shuffleToggle').checked = saved.shuffle;
-    				if (saved.speed) document.getElementById('advanceTime').value = saved.speed;
-			}
+                
                 populateFolderFilter();
-                filterGalleryByFolder();
+                filterGalleryByFolder(true); // Record initial state
                 
             } catch (error) {
                 console.error('Error:', error);
@@ -602,13 +637,52 @@
             });
         }
 
-        function filterGalleryByFolder() {
+        function updateNavigationButtons() {
+            document.getElementById('navBackBtn').disabled = historyIndex <= 0;
+            document.getElementById('navForwardBtn').disabled = historyIndex >= navigationHistory.length - 1;
+        }
+
+        function navigateBack() {
+            if (historyIndex > 0) {
+                historyIndex--;
+                const folder = navigationHistory[historyIndex];
+                document.getElementById('folderFilter').value = folder;
+                filterGalleryByFolder(false);
+            }
+        }
+
+        function navigateForward() {
+            if (historyIndex < navigationHistory.length - 1) {
+                historyIndex++;
+                const folder = navigationHistory[historyIndex];
+                document.getElementById('folderFilter').value = folder;
+                filterGalleryByFolder(false);
+            }
+        }
+
+        function navigateRoot() {
+            document.getElementById('folderFilter').value = 'all';
+            filterGalleryByFolder(true);
+        }
+
+        function filterGalleryByFolder(recordHistory = true) {
             const select = document.getElementById('folderFilter');
             const folderName = select.value;
             const grid = document.querySelector('.grid');
             const shuffleEnabled = document.getElementById('shuffleToggle').checked;
             const thumbnailWidth = document.getElementById('thumbnailWidth').value;
             
+            // History Logic
+            if (recordHistory) {
+                if (historyIndex === -1 || navigationHistory[historyIndex] !== folderName) {
+                    // Truncate forward history if we diverge
+                    navigationHistory = navigationHistory.slice(0, historyIndex + 1);
+                    navigationHistory.push(folderName);
+                    historyIndex++;
+                }
+            }
+            updateNavigationButtons();
+
             if (masonry) {
                 masonry.destroy();
                 masonry = null;
@@ -616,12 +690,11 @@
 
 			grid.innerHTML = '';
             
-            // --- NEW: Folder Navigation Logic ---
-            // Find immediate subfolders of the current selection
+            // --- Folder Navigation Cards ---
             const currentPrefix = folderName === 'all' ? '' : folderName + '/';
             const subfolders = allDirectories.filter(dir => {
                 if (folderName === 'all') {
-                    return !dir.includes('/'); // Top level folders only
+                    return !dir.includes('/'); 
                 }
                 return dir.startsWith(currentPrefix) && 
                        dir.slice(currentPrefix.length).indexOf('/') === -1 &&
@@ -641,7 +714,7 @@
                     `;
                     card.onclick = () => {
                         select.value = subDir;
-                        filterGalleryByFolder();
+                        filterGalleryByFolder(true);
                     };
                     return card;
                 });
@@ -660,6 +733,7 @@
             loadedMediaCount = 0;
             updateFileCounter();
             loadMoreMedia();
+            saveSettings();
         }
 
         function shuffleArray(array) {
@@ -681,22 +755,12 @@
         }
 
         function forceReshuffle() {
-            filterGalleryByFolder();
+            filterGalleryByFolder(false); // Don't record history for reshuffle
         }
-
-		function saveSettings() {
- 		   const settings = {
-        	thumbWidth: document.getElementById('thumbnailWidth').value,
-        	shuffle: document.getElementById('shuffleToggle').checked,
-        	speed: document.getElementById('advanceTime').value,
-        	lastFolder: document.getElementById('folderFilter').value
-    	};
-    		localStorage.setItem('gallerySettings', JSON.stringify(settings));
-	}
 
         function resetViewed() {
             viewedFiles.clear();
-            filterGalleryByFolder();
+            filterGalleryByFolder(false);
         }
 
         function scrollToTop() {
@@ -745,7 +809,6 @@
         }
 
         function appendMediaToGrid(files) {
-            // Re-init masonry if we added folders but no files yet
             const grid = document.querySelector('.grid');
             if (files.length === 0) {
                  if (!masonry && grid.children.length > 0) initializeMasonry();
@@ -814,11 +877,11 @@
             let mediaElement;
             if (isVideo) {
                 mediaElement = document.createElement('video');
-				mediaElement.volume = globalVolume;
-				mediaElement.onvolumechange = (e) => globalVolume = e.target.volume;
-                mediaElement.controls = true; // Ensure native controls work
+                mediaElement.controls = true; 
                 mediaElement.autoplay = true;
                 mediaElement.loop = true;
+                mediaElement.volume = globalVolume; 
+                mediaElement.onvolumechange = (e) => globalVolume = e.target.volume;
             } else {
                 mediaElement = document.createElement('img');
             }
@@ -840,7 +903,6 @@
             infoDiv.querySelector('.media-filetype').textContent = `${getFileExtension(mediaInfo.name)} • ${mediaInfo.isVideo ? 'Video' : 'Image'}`;
             
             document.getElementById('prevBtn').disabled = currentMediaIndex <= 0;
-            // FIX: Corrected variable name from currentMediaFiles to allMediaFiles
             document.getElementById('nextBtn').disabled = currentMediaIndex >= allMediaFiles.length - 1;
         }
 
@@ -859,7 +921,7 @@
             stopAutoAdvance();
             currentMediaIndex = -1;
             const content = document.querySelector('.fullscreen-content');
-            content.innerHTML = ''; // Stop video playback
+            content.innerHTML = ''; 
         }
 
         function resetControlsTimer() {
@@ -935,7 +997,6 @@
 
         document.getElementById('fullscreenOverlay').addEventListener('mousedown', (e) => {
             if (e.target.closest('.close-btn, .playback-controls, .nav-btn')) return;
-            // FIX: Prevent navigation if clicking video controls
             if (e.target.tagName === 'VIDEO') return;
             
             e.preventDefault();
@@ -945,7 +1006,6 @@
         });
 
         document.getElementById('fullscreenOverlay').addEventListener('contextmenu', (e) => {
-            // Allow context menu on videos for controls
             if (e.target.tagName === 'VIDEO') return;
             e.preventDefault();
             if (currentMediaIndex > 0) navigateFullscreen(-1);
