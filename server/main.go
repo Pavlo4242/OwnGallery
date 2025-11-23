@@ -45,6 +45,9 @@ type FileInfo struct {
 
 func main() {
 	log.Printf("Media Gallery Server %s (built %s)", Version, BuildTime)
+	log.Printf("Server started with arguments: %v", os.Args) 
+    
+    log.Printf("Media Gallery Server %s (built %s)", Version, BuildTime)
 
 	mediaDir, err := os.Getwd()
 	if err != nil {
