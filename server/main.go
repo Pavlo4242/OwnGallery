@@ -20,6 +20,7 @@ import (
 	"runtime"
 	"strings"
 	"time"
+	"fmt" // Added for creating errors and logging
 )
 
 //go:embed web/*
@@ -84,7 +85,7 @@ func main() {
 	log.Printf("🚀 Gallery ready at: %s", url)
 	log.Printf("Press Ctrl+C to stop")
 
-	// FIXED: Only auto-open browser if NOT launched by launcher
+	// Only auto-open browser if NOT launched by launcher AND not explicitly disabled
 	if !noBrowser {
 		log.Println("Auto-opening browser...")
 		go func() {
@@ -136,6 +137,25 @@ func setupRoutes(mediaDir string) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(response)
 	})
+	
+	// NEW: API endpoint to return the current root directory path
+    http.HandleFunc("/api/root_dir", func(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set("Content-Type", "application/json")
+        json.NewEncoder(w).Encode(map[string]string{
+            "root_dir": mediaDir,
+        })
+    })
+
+    // NEW: API endpoint to open the directory in the native file explorer
+    http.HandleFunc("/api/open_explorer", func(w http.ResponseWriter, r *http.Request) {
+        err := openFileExplorer(mediaDir)
+        if err != nil {
+            http.Error(w, "Failed to open explorer: "+err.Error(), http.StatusInternalServerError)
+            return
+        }
+        w.WriteHeader(http.StatusOK)
+    })
+
 
 	// Health check endpoint
 	http.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
@@ -165,7 +185,7 @@ func getDetailedFileListAndFolders(dir string) ([]FileInfo, []string, error) {
             if info.IsDir() {
                 return filepath.SkipDir // Don't descend into hidden folders
             }
-            return nil
+            return nil // Skip hidden files
         }
 
         // If it's a directory, add its relative path to the list
@@ -268,6 +288,32 @@ func corsMiddleware(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+// Helper function to open the native file explorer to the given path
+func openFileExplorer(path string) error {
+	var cmd *exec.Cmd
+
+	switch runtime.GOOS {
+	case "windows":
+		// Windows: use 'explorer' command
+		cmd = exec.Command("explorer", path)
+	case "darwin":
+		// macOS: use 'open' command
+		cmd = exec.Command("open", path)
+	case "linux":
+		// Linux: use 'xdg-open' command (common cross-desktop utility)
+		cmd = exec.Command("xdg-open", path)
+	default:
+		return fmt.Errorf("unsupported operating system: %s", runtime.GOOS)
+	}
+
+	// Start the command asynchronously
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start file explorer: %w", err)
+	}
+	log.Printf("Opened file explorer to: %s", path)
+	return nil
 }
 
 func openBrowser(url string) {
