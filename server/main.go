@@ -167,41 +167,97 @@
      	})
      }
 	 
-	 // NEW: API endpoint to delete a file
-		http.HandleFunc("/api/delete", func(w http.ResponseWriter, r *http.Request) {
-			if r.Method != "POST" {
-				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-				return
+func setupRoutes(mediaDir string) {
+	// Serve embedded web files
+	webFS, err := fs.Sub(webFiles, "web")
+	if err != nil {
+		log.Fatal(err)
+	}
+	http.Handle("/", corsMiddleware(http.FileServer(http.FS(webFS))))
+
+	// Serve media files from current directory
+	http.Handle("/media/", corsMiddleware(
+		http.StripPrefix("/media/", http.FileServer(http.Dir(mediaDir)))))
+
+	// API endpoint for file list (with details)
+	http.HandleFunc("/api/files", func(w http.ResponseWriter, r *http.Request) {
+		 files, directories, err := getDetailedFileListAndFolders(mediaDir)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		response := ApiResponse{
+            Files:       files,
+            Directories: directories,
 			}
-			
-			var req struct {
-				Path string `json:"path"`
-			}
-			
-			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-				http.Error(w, "Invalid request", http.StatusBadRequest)
-				return
-			}
-			
-			fullPath := filepath.Join(mediaDir, req.Path)
-			
-			// Security: ensure path is within mediaDir
-			if !strings.HasPrefix(filepath.Clean(fullPath), filepath.Clean(mediaDir)) {
-				http.Error(w, "Invalid path", http.StatusForbidden)
-				return
-			}
-			
-			err := os.Remove(fullPath)
-			if err != nil {
-				http.Error(w, "Failed to delete file: "+err.Error(), http.StatusInternalServerError)
-				return
-			}
-			
-			log.Printf("Deleted file: %s", fullPath)
-			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(map[string]string{"status": "deleted"})
+		
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(response)
+	})
+	
+	// NEW: API endpoint to return the current root directory path
+    http.HandleFunc("/api/root_dir", func(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set("Content-Type", "application/json")
+        json.NewEncoder(w).Encode(map[string]string{
+            "root_dir": mediaDir,
+        })
+    })
+
+    // NEW: API endpoint to open the directory in the native file explorer
+    http.HandleFunc("/api/open_explorer", func(w http.ResponseWriter, r *http.Request) {
+        err := openFileExplorer(mediaDir)
+        if err != nil {
+            http.Error(w, "Failed to open explorer: "+err.Error(), http.StatusInternalServerError)
+            return
+        }
+        w.WriteHeader(http.StatusOK)
+    })
+
+	// NEW: API endpoint to delete a file
+	http.HandleFunc("/api/delete", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		
+		var req struct {
+			Path string `json:"path"`
+		}
+		
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid request", http.StatusBadRequest)
+			return
+		}
+		
+		fullPath := filepath.Join(mediaDir, req.Path)
+		
+		// Security: ensure path is within mediaDir
+		if !strings.HasPrefix(filepath.Clean(fullPath), filepath.Clean(mediaDir)) {
+			http.Error(w, "Invalid path", http.StatusForbidden)
+			return
+		}
+		
+		err := os.Remove(fullPath)
+		if err != nil {
+			http.Error(w, "Failed to delete file: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		
+		log.Printf("Deleted file: %s", fullPath)
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"status": "deleted"})
+	})
+
+	// Health check endpoint
+	http.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{
+			"status":  "ok",
+			"version": Version,
 		})
-     
+	})
+}
      func getDetailedFileListAndFolders(dir string) ([]FileInfo, []string, error) {
          extensions := map[string]bool{
              ".jpg": false, ".jpeg": false, ".png": false, ".webp": false,
