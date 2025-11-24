@@ -243,6 +243,17 @@ func setupRoutes(mediaDir string) {
 			"version": Version,
 		})
 	})
+http.HandleFunc("/api/quit", func(w http.ResponseWriter, r *http.Request) {
+        if r.Method != "POST" {
+            http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+            return
+        }
+        w.Write([]byte("Server shutting down..."))
+        go func() {
+            time.Sleep(500 * time.Millisecond)
+            os.Exit(0)
+        }()
+    })
 }
 
 func getDetailedFileListAndFolders(dir string) ([]FileInfo, []string, error) {
