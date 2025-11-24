@@ -1778,31 +1778,28 @@
             }
         });
 
-        grid.append(...elements);
+grid.append(...elements);
 
-        if (viewMode === 'grid') {
-            if (masonry) {
-                masonry.appended(elements);
-                imagesLoaded(elements, () => {
-                    masonry.layout();
-                    setTimeout(manageVideoPlayback, 200);
-                });
-            } else {
-                imagesLoaded(elements, () => {
-                    if (!masonry) {
-                        initializeMasonry();
-                        setTimeout(() => {
-                            if (masonry) masonry.layout();
-                            manageVideoPlayback();
-                        }, 50);
-                    }
-                });
+            if (viewMode === 'grid') {
+                if (masonry) {
+                    masonry.appended(elements);
+                    imagesLoaded(elements, () => {
+                        masonry.layout();
+                        setTimeout(manageVideoPlayback, 200);
+                    });
+                } else {
+                    imagesLoaded(elements, () => {
+                        if(!masonry){ 
+                            initializeMasonry();
+                            setTimeout(() => masonry && masonry.layout(), 50);
+                        }
+                    });
+                }
             }
+            
+            setTimeout(manageVideoPlayback, 500);
+            updateFileCounter();
         }
-        
-        setTimeout(manageVideoPlayback, 500);
-        updateFileCounter();
-    }
 
     function loadMoreMedia() {
         const nextBatch = allMediaFiles.slice(loadedMediaCount, loadedMediaCount + filesPerLoad);
@@ -2102,7 +2099,7 @@
 
     // ============ INITIALIZATION ============
     window.addEventListener('DOMContentLoaded', initializeGallery);
-    }
+
 	</script>
 </body>
 </html>
