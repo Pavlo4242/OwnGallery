@@ -265,7 +265,18 @@ void ChangeFolderAndRestart() {
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
+        case WM_TIMER:
+            if (wParam == 1) {
+                // Check if server process is still running
+                if (WaitForSingleObject(hServerProcess, 0) == WAIT_OBJECT_0) {
+                    // Server has exited, close the launcher
+                    DestroyWindow(hwnd);
+                }
+            }
+            break;
+
         case WM_TRAY_ICON:
+
             if (lParam == WM_RBUTTONUP) {
                 POINT curPoint;
                 GetCursorPos(&curPoint);
