@@ -914,7 +914,7 @@
     <script src="masonry.pkgd.min.js"></script>
     <script src="imagesloaded.pkgd.min.js"></script>
 	
-	// MAIN JAVASCRIPT - GLOBAL VARIABLES SECTION
+	
 <script>
     // ============ GLOBAL VARIABLES ============
     let allMediaFiles = [];
@@ -942,6 +942,8 @@
     let videoPlayLimit = 5;
     let animObserver = null;
     let hoveredMedia = null;
+    let overlayTransitioning = false; 
+
 
     // Navigation History Variables
     let navigationHistory = [];
@@ -1214,9 +1216,11 @@
                 const originalSrc = obj.webp.dataset.src || obj.webp.src;
                 if (!obj.webp.dataset.src) obj.webp.dataset.src = originalSrc;
 
-                if (shouldPlay) {
+               if (shouldPlay && obj.webp) {
                    if (!obj.webp.getAttribute('src')) obj.webp.src = originalSrc;
                 } else {
+                    // Optional: clear src to stop animation/save memory
+                    // if (obj.webp) obj.webp.removeAttribute('src'); 
                 }
             }
         });
@@ -1630,7 +1634,7 @@
         const parts = fileName.split('.');
         return parts.length > 1 ? parts[parts.length - 1].toUpperCase() : 'FILE';
     }
-javascript
+
     // ============ MEDIA RENDERING FUNCTIONS ============
     function createMediaElement(fileName) {
         const mediaInfo = MEDIA_DATA[fileName];
@@ -1843,7 +1847,11 @@ javascript
     }
 	
 	    // ============ FULLSCREEN FUNCTIONS ============
-    function openFullscreen(fileName) {
+     function openFullscreen(fileName) {
+        if (overlayTransitioning) return; // Block accidental re-triggers
+        overlayTransitioning = true;
+        setTimeout(() => { overlayTransitioning = false; }, 500); // Release lock after animation
+
         const overlay = document.getElementById('fullscreenOverlay');
         const content = document.querySelector('.fullscreen-content');
         
@@ -2023,6 +2031,7 @@ javascript
         if (video) {
             video.currentTime += seconds;
         }
+	}
 		
 		   // ============ EVENT LISTENERS ============
     document.getElementById('thumbnailWidth').addEventListener('input', (e) => {
@@ -2056,7 +2065,10 @@ javascript
         }
     });
 
-    document.getElementById('fullscreenOverlay').addEventListener('mousedown', (e) => {
+      document.getElementById('fullscreenOverlay').addEventListener('mousedown', (e) => {
+        if (overlayTransitioning) return; // Ignore clicks during open animation
+        
+        
         if (e.button === 1) {
             e.preventDefault();
             closeFullscreen();
