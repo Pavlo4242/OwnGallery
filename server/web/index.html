@@ -783,10 +783,10 @@
             <span>📁</span>
             <span id="folderName" class="current-folder-path">Loading Root Path...</span>
         </button>
-        <div class="file-counter" id="fileCounter">0 files</div>
+    <div class="file-counter" id="fileCounter">0 files</div>
         <div class="nav-controls">
             <button onclick="navigateBack()" id="navBackBtn" title="Go Back">←</button>
-            <button onclick="navigateRoot()" id="navRootBtn" title="Return to Root">■</button>
+            <button onclick="navigateUp()" id="navParentBtn" title="Go to Parent Folder">↑</button>
             <button onclick="navigateForward()" id="navForwardBtn" title="Go Forward">→</button>
         </div>
     </div>
@@ -826,10 +826,12 @@
         <button onclick="filterFavorites()">⭐ Favorites</button>
         
         <label>
+       <label>
             <input type="checkbox" id="shuffleToggle" onchange="saveSettings()"> Shuffle
         </label>
         <button onclick="forceReshuffle()">🔀 Re-shuffle</button>
         <button onclick="resetViewed()">↺ Reset Viewed</button>
+        <button onclick="quitServer()" class="delete-btn" style="border-color: #d32f2f !important; background-color: rgba(211, 47, 47, 0.2) !important;">❌ Quit</button>
     </div>
     
     <div class="controls-right">
@@ -862,12 +864,16 @@
         <div class="media-filename"></div>
         <div class="media-filetype"></div>
     </div>
-    <div class="playback-controls" id="playbackControls">
+  <div class="playback-controls" id="playbackControls">
         <button id="playPauseBtn">▶ Play</button>
         <button id="toggleShuffleBtn" onclick="toggleShuffleInSlideshow()">🔀 Shuffle: OFF</button>
         <button id="sequentialModeBtn" onclick="toggleSequentialMode()">
             📋 <span id="modeText">Sequential</span>
         </button>
+        <div style="display:flex; gap:5px; justify-content:center;">
+             <button onclick="seekVideo(-10)" style="padding: 8px;">⏪ 10s</button>
+             <button onclick="seekVideo(10)" style="padding: 8px;">10s ⏩</button>
+        </div>
         <div style="text-align: center;">
             <label style="color: white; font-size: 11px;">Speed (ms)</label>
             <input type="number" id="advanceTime" min="500" max="30000" step="100" value="3000" 
@@ -877,7 +883,10 @@
         <button onclick="closeFullscreen()">↩ Back to Gallery</button>
         <button onclick="scrollToTop()">↑ Back to Top</button>
     </div>
-    <button class="bottom-right-root" onclick="returnToRootFromFullscreen()">■ Return to Root</button>
+    <div style="position: absolute; bottom: 30px; right: 30px; display: flex; gap: 10px;">
+        <button class="bottom-right-root" style="position: relative; bottom: auto; right: auto;" onclick="navigateUp()">↑ Parent</button>
+        <button class="bottom-right-root" style="position: relative; bottom: auto; right: auto;" onclick="returnToRootFromFullscreen()">■ Return to Root</button>
+    </div>
     
     <div id="verticalProgress" class="vertical-progress-bar" onclick="jumpToProgress(event)">
         <div class="vertical-progress-fill" id="progressFill"></div>
@@ -918,6 +927,10 @@
     let sequentialMode = true;
     let videoPlayLimit = 5;
     let animObserver = null;
+    let hoveredMedia = null;
+
+    // Navigation History Variables
+    let navigationHistory = [];
 
     // Navigation History Variables
     let navigationHistory = [];
@@ -1063,6 +1076,14 @@
             .catch(err => {
                 alert('Error deleting files: ' + err.message);
             });
+
+         function quitServer() {
+        if (!confirm('Stop the media server? You will need to restart it manually.')) return;
+        fetch('/api/quit', { method: 'POST' })
+            .then(() => {
+                document.body.innerHTML = '<div style="display:flex;justify-content:center;align-items:center;height:100vh;color:#f44336;background:#0a0a0a;font-family:sans-serif;"><h1>Server Stopped</h1></div>';
+            })
+            .catch(e => alert('Error stopping server'));
     }
 
     // --- Favorites ---
@@ -1136,33 +1157,73 @@
     }
 
     // --- Playback Management (Videos & WebP) ---
-    function manageVideoPlayback() {
-        const videos = Array.from(document.querySelectorAll('.grid video'));
-        const visibleVideos = videos.filter(video => {
-            const rect = video.getBoundingClientRect();
+   function manageVideoPlayback() {
+        const viewportItems = Array.from(document.querySelectorAll('.grid-item'));
+        const visibleItems = viewportItems.filter(item => {
+            const rect = item.getBoundingClientRect();
             return rect.top < window.innerHeight && rect.bottom > 0;
         });
+
+        // Identify playable media (Videos and Animated WebPs)
+        const playables = visibleItems.map(item => {
+            const video = item.querySelector('video');
+            const webp = item.querySelector('img[src$=".webp"]');
+            return { item, video, webp };
+        }).filter(obj => obj.video || obj.webp);
+
+        // Logic: 
+        // 1. Hovered item ALWAYS plays.
+        // 2. Pick up to (Limit - 1) random others from the visible set to play.
         
-        videos.forEach(v => {
-            if (!visibleVideos.includes(v)) {
-                v.pause();
-                v.currentTime = 0;
+        const activeSet = new Set();
+        
+        if (hoveredMedia) {
+            const hoveredObj = playables.find(p => p.item === hoveredMedia);
+            if (hoveredObj) activeSet.add(hoveredObj);
+        }
+
+        // Shuffle remaining playables
+        const others = playables.filter(p => !activeSet.has(p));
+        for (let i = others.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [others[i], others[j]] = [others[j], others[i]];
+        }
+
+        // Fill quota
+        for (const obj of others) {
+            if (activeSet.size >= videoPlayLimit) break;
+            activeSet.add(obj);
+        }
+
+        // Apply state
+        playables.forEach(obj => {
+            const shouldPlay = activeSet.has(obj);
+            
+            if (obj.video) {
+                if (shouldPlay) {
+                    if (obj.video.paused) obj.video.play().catch(() => {});
+                } else {
+                    obj.video.pause();
+                }
             }
-        });
-        
-        const toPlay = visibleVideos.slice(0, videoPlayLimit);
-        toPlay.forEach(v => {
-            if (v.paused) {
-                v.play().catch(() => {});
+            
+            if (obj.webp) {
+                // For WebP: Swap src with dataset.src to animate, or empty to freeze/unload
+                // Note: Standard img tag doesn't "pause", so we toggle source to save resources
+                const originalSrc = obj.webp.dataset.src || obj.webp.src;
+                if (!obj.webp.dataset.src) obj.webp.dataset.src = originalSrc;
+
+                if (shouldPlay) {
+                   if (!obj.webp.getAttribute('src')) obj.webp.src = originalSrc;
+                } else {
+                   // Optional: To strictly save resources, unset src. 
+                   // But this causes flickering. Keeping WebPs loaded is usually fine.
+                   // If strict limit required:
+                   // obj.webp.removeAttribute('src'); 
+                }
             }
-        });
-        
-        visibleVideos.slice(videoPlayLimit).forEach(v => {
-            v.pause();
-            v.currentTime = 0;
         });
     }
-
     function initAnimObserver() {
         if (animObserver) return;
         
@@ -1404,12 +1465,25 @@
         scrollToTop();
     }
 
-    function updateNavigationButtons() {
+   function updateNavigationButtons() {
         document.getElementById('navBackBtn').disabled = historyIndex <= 0;
         document.getElementById('navForwardBtn').disabled = historyIndex >= navigationHistory.length - 1;
     }
 
+    function navigateUp() {
+        const current = document.getElementById('folderFilter').value;
+        if (current === 'all') return;
+        
+        const parts = current.split('/');
+        parts.pop(); // Remove current folder
+        const parent = parts.length === 0 ? 'all' : parts.join('/');
+        
+        document.getElementById('folderFilter').value = parent;
+        filterGalleryByFolder(true);
+    }
+
     function navigateBack() {
+        
         if (historyIndex > 0) {
             historyIndex--;
             const folder = navigationHistory[historyIndex];
@@ -1688,12 +1762,23 @@
                     }
                 });
                 
-                gridItem.addEventListener('mouseenter', () => showQuickPreview(fileName));
+                      gridItem.addEventListener('mouseenter', () => showQuickPreview(fileName));
                 gridItem.addEventListener('mouseleave', hideQuickPreview);
                 
+                // Add Hover Playback Logic
+                gridItem.addEventListener('mouseenter', () => {
+                    hoveredMedia = gridItem;
+                    manageVideoPlayback();
+                });
+                gridItem.addEventListener('mouseleave', () => {
+                    hoveredMedia = null;
+                    manageVideoPlayback();
+                });
+
                 return gridItem;
             }
         });
+
 
         grid.append(...elements);
 
@@ -1779,19 +1864,21 @@
         content.innerHTML = '';
 
         let mediaElement;
-        if (isVideo) {
-            mediaElement = document.createElement('video');
-            mediaElement.controls = true; 
-            mediaElement.autoplay = true;
-            mediaElement.loop = true;
-            mediaElement.volume = globalVolume; 
-            mediaElement.onvolumechange = (e) => globalVolume = e.target.volume;
-        } else {
-            mediaElement = document.createElement('img');
+       if (isVideo) {
+            // Prevent video from trapping navigation keys
+            mediaElement.addEventListener('keydown', (e) => {
+                if (['ArrowLeft', 'ArrowRight', 'a', 'd'].includes(e.key)) {
+                    e.preventDefault();
+                    // Manually trigger navigation since we consumed the event
+                    if (e.key === 'ArrowRight' || e.key === 'd') navigateFullscreen(1);
+                    if (e.key === 'ArrowLeft' || e.key === 'a') navigateFullscreen(-1);
+                }
+            });
         }
 
         mediaElement.src = mediaInfo.url;
         content.appendChild(mediaElement);
+        
         updateProgressBar();
 
         updateFullscreenInfo(fileName);
@@ -2002,8 +2089,15 @@
     });
 
     document.getElementById('fullscreenOverlay').addEventListener('mousemove', resetControlsTimer);
+ function seekVideo(seconds) {
+        const video = document.querySelector('.fullscreen-content video');
+        if (video) {
+            video.currentTime += seconds;
+        }
+    }
 
     window.addEventListener('DOMContentLoaded', initializeGallery);
 </script>
 </body>
+
 </html>
