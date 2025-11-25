@@ -1852,7 +1852,7 @@ grid.append(...elements);
      function openFullscreen(fileName) {
         if (overlayTransitioning) return; // Block accidental re-triggers
         overlayTransitioning = true;
-        setTimeout(() => { overlayTransitioning = false; }, 500); // Release lock after animation
+        setTimeout(() => { overlayTransitioning = false; }, 100); // Release lock after animation
 
         const overlay = document.getElementById('fullscreenOverlay');
         const content = document.querySelector('.fullscreen-content');
@@ -1932,21 +1932,8 @@ grid.append(...elements);
     }
 
     function navigateFullscreen(direction, forceSequential = false) {
-        let newIndex;
-        
-        if (!forceSequential && !sequentialMode && direction > 0) {
-            const unviewed = allMediaFiles.filter((file, idx) => idx !== currentMediaIndex && !viewedFiles.has(file));
-            if (unviewed.length > 0) {
-                const randomFile = unviewed[Math.floor(Math.random() * unviewed.length)];
-                newIndex = allMediaFiles.indexOf(randomFile);
-            } else {
-                const others = allMediaFiles.filter((_, idx) => idx !== currentMediaIndex);
-                const randomFile = others[Math.floor(Math.random() * others.length)];
-                newIndex = allMediaFiles.indexOf(randomFile);
-            }
-        } else {
-            newIndex = currentMediaIndex + direction;
-        }
+        // Always follow the current list order (which is sorted or shuffled based on the checkbox)
+        let newIndex = currentMediaIndex + direction;
         
         if (newIndex >= 0 && newIndex < allMediaFiles.length) {
             currentMediaIndex = newIndex;
