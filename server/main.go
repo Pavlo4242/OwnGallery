@@ -267,13 +267,16 @@ func getDetailedFileListAndFolders(dir string) ([]FileInfo, []string, error) {
     var directories []string // New list for directories
     
     err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+        // If there is an error accessing the path (e.g. permission denied), skip it
         if err != nil {
-            return err
-        }
-        if strings.HasPrefix(info.Name(), ".") { // Skip hidden files/folders
-            if info.IsDir() {
-                return filepath.SkipDir // Don't descend into hidden folders
+            log.Printf("⚠️ Error accessing path %q: %v", path, err)
+            if info != nil && info.IsDir() {
+                return filepath.SkipDir
             }
+            return nil
+        }
+
+        if strings.HasPrefix(info.Name(), ".") { // Skip hidden files/folders
             return nil // Skip hidden files
         }
 
