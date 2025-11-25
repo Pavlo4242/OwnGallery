@@ -1370,11 +1370,15 @@
         document.getElementById('listViewBtn').classList.toggle('active', viewMode === 'list');
         
         try {
-            const response = await fetch('/api/files');
+ 			const response = await fetch('/api/files');
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             
             const apiData = await response.json();
             const fileList = apiData.files || [];
+            
+            // Sort files alphabetically to ensure deterministic order
+            fileList.sort((a, b) => a.path.localeCompare(b.path, undefined, {numeric: true, sensitivity: 'base'}));
+
             allDirectories = apiData.directories || [];
 
             if (fileList.length === 0 && allDirectories.length === 0) {
