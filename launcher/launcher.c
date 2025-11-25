@@ -470,7 +470,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     nid.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_TRAY_ICON));
     UpdateTrayTooltip(currentDir);
     Shell_NotifyIcon(NIM_ADD, &nid);
-    
+    // This line is REQUIRED for the WM_TIMER event to fire:
+    SetTimer(hMainWindow, 1, 1000, NULL);
     MSG msg = {0};
     while (GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
