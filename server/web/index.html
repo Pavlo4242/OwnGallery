@@ -989,9 +989,10 @@
 
     function loadSettings() {
         const saved = JSON.parse(localStorage.getItem('gallerySettings'));
-        if (saved) {
+		if (saved) {
             if (saved.thumbWidth) document.getElementById('thumbnailWidth').value = saved.thumbWidth;
-            if (saved.shuffle) document.getElementById('shuffleToggle').checked = saved.shuffle;
+            // Shuffle is off by default
+            // if (saved.shuffle) document.getElementById('shuffleToggle').checked = saved.shuffle;
             if (saved.speed) document.getElementById('advanceTime').value = saved.speed;
             if (saved.slideshowShuffle !== undefined) {
                 slideshowShuffle = saved.slideshowShuffle;
