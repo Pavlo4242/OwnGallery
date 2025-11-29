@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Media Gallery + AI Sorter</title>
+    <style>
+        * {
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            background-color: #0a0a0a;
+            color: #e0e0e0;
+        }
+
+        /* --- CONTROLS STYLING --- */
+        .controls {
+            padding: 10px 15px;
+            background: linear-gradient(135deg, #1e1e1e 0%, #2d2d2d 100%);
+            border-bottom: 1px solid #3a3a3a;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        }
+
+        .controls-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(0,0,0,0.2);
+            padding: 5px 10px;
+            border-radius: 8px;
+            border: 1px solid #3a3a3a;
+        }
+
+        .current-folder {
+            color: #4CAF50;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .file-counter {
+            color: #2196F3;
+            font-size: 12px;
+        }
+
+        .controls label {
+            color: #b0b0b0;
+            font-size: 12px;
+        }
+
+        .controls input[type="range"] {
+            width: 100px;
+            vertical-align: middle;
+        }
+
+        .controls input[type="number"] {
+            width: 50px;
+            background: #1a1a1a;
+            border: 1px solid #444;
+            color: white;
+            padding: 4px;
+            border-radius: 4px;
+        }
+
+        .controls select,
+        .controls button {
+            padding: 6px 12px;
+            background-color: #2a2a2a;
+            color: #e0e0e0;
+            border: 1px solid #3a3a3a;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 10px;
+        }
+		
+		.controls button.shutdown {
+			background-color: #5a1e1e !important;
+			color: white !important;
+		}
+		.controls button.shutdown:hover {
+			background-color: #7a2e2e !important;
+		}
+		
+		.ai-counters {
+			display: flex;
+			gap: 10px;
+			font-size: 12px;
+			font-weight: bold;
+			}
+
+        .controls button:hover {
+            background-color: #444;
+        }
+
+        /* --- GRID STYLING --- */
+        .grid {
+            margin: 20px;
+            min-height: 100vh;
+        }
+
+        .grid-item {
+            width: 250px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            overflow: hidden;
+            background-color: #1a1a1a;
+            position: relative;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            border: 2px solid transparent; /* For status coloring */
+        }
+
+        .grid-item:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.6);
+            z-index: 10;
+        }
+
+        /* AI Status Indicators */
+        .grid-item.status-keep {
+            border-color: #4CAF50;
+        }
+        .grid-item.status-discard {
+            border-color: #F44336;
+        }
+
+        .ai-badge {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: bold;
+            color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            z-index: 5;
+        }
+        .ai-badge.keep { background: rgba(76, 175, 80, 0.9); }
+        .ai-badge.discard { background: rgba(244, 67, 54, 0.9); }
+
+        .grid-item img,
+        .grid-item video {
+            display: block;
+            width: 100%;
+            height: auto;
+            pointer-events: none;
+        }
+
+        .item-info {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
+            padding: 8px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 11px;
+            color: #fff;
+        }
+        .grid-item:hover .item-info { opacity: 1; }
+
+        /* --- FULLSCREEN OVERLAY --- */
+        .fullscreen-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background-color: rgba(0, 0, 0, 0.98);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.2s;
+        }
+        .fullscreen-overlay.visible { opacity: 1; visibility: visible; }
+
+        .fullscreen-content {
+            width: 100%; height: 100%;
+            display: flex; justify-content: center; align-items: center;
+        }
+        .fullscreen-content img, .fullscreen-content video {
+            max-width: 95vw; max-height: 95vh;
+            object-fit: contain;
+        }
+
+        .media-info {
+            position: absolute;
+            bottom: 20px; left: 20px;
+            background: rgba(0,0,0,0.8);
+            padding: 15px;
+            border-radius: 12px;
+            max-width: 400px;
+            backdrop-filter: blur(5px);
+            border-left: 4px solid #555;
+        }
+        
+        .media-info.info-keep { border-left-color: #4CAF50; }
+        .media-info.info-discard { border-left-color: #F44336; }
+
+        .score-details {
+            margin-top: 8px;
+            font-size: 12px;
+            color: #bbb;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5px;
+        }
+        .score-val { color: #fff; font-family: monospace; }
+        .score-good { color: #4CAF50; }
+        .score-bad { color: #F44336; }
+
+        /* Navigation Buttons */
+        .nav-btn {
+            position: absolute; top: 50%; transform: translateY(-50%);
+            background: rgba(255,255,255,0.1); border: none; color: white;
+            font-size: 30px; width: 60px; height: 60px; border-radius: 50%;
+            cursor: pointer; z-index: 1002; transition: 0.2s;
+        }
+        .nav-btn:hover { background: rgba(255,255,255,0.3); }
+        .prev-btn { left: 20px; }
+        .next-btn { right: 20px; }
+        .close-btn {
+            position: absolute; top: 20px; right: 20px;
+            color: white; font-size: 40px; cursor: pointer; z-index: 1002;
+        }
+
+        .scroll-progress {
+            position: fixed; bottom: 10px; right: 10px;
+            background: rgba(0,0,0,0.7); color: #888; padding: 5px 10px;
+            border-radius: 10px; font-size: 10px;
+        }
+
+        /* Loading Spinner */
+        .loading { text-align: center; padding: 50px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <div class="controls-group">
+            <div class="current-folder" id="currentFolder">📁 <span id="folderName">Loading...</span></div>
+            <div class="file-counter" id="fileCounter">0</div>
+        <div class="ai-counters">
+        <span style="color:#4CAF50">✅ <span id="keepCount">0</span></span>
+        <span style="color:#F44336">❌ <span id="discardCount">0</span></span>
+    </div>
+</div>
+
+        
+        <div class="controls-group">
+            <label>AI Thresholds:</label>
+            <label title="Realism/CGI Threshold">Content:</label>
+            <input type="number" id="contentThresh" value="0.25" step="0.01" min="0.1" max="1.0" onchange="recalcScores()">
+            <label title="Negative/Sketch Threshold (Lower = Stricter)">Neg:</label>
+            <input type="number" id="negThresh" value="0.22" step="0.01" min="0.1" max="1.0" onchange="recalcScores()">
+        </div>
+
+        <div class="controls-group">
+            <label>Filter:</label>
+            <select id="scoreFilter" onchange="filterGalleryByFolder()">
+                <option value="all">All Items</option>
+                <option value="keep">✅ Keep Only</option>
+                <option value="discard">❌ Discard Only</option>
+                <option value="unscored">⚪ Unscored</option>
+            </select>
+            <select id="folderFilter" onchange="filterGalleryByFolder()">
+                <option value="all">All Folders</option>
+            </select>
+        </div>
+		<div class="controls-group">
+			<button onclick="shutdownServer()" style="background-color: #5a1e1e; color: white;">⏻ Shutdown</button>
+			</div>
+		</div>
+
+        <div class="controls-group">
+            <label>Size:</label>
+            <input type="range" id="thumbnailWidth" min="150" max="500" value="250">
+            <button onclick="initializeGallery()">🔄 Refresh</button>
+        </div>
+    </div>
+
+    <div class="grid"></div>
+    
+    <div class="scroll-progress">Loaded: <span id="loadedCount">0</span>/<span id="totalCount">0</span></div>
+
+    <!-- Fullscreen Overlay -->
+    <div id="fullscreenOverlay" class="fullscreen-overlay">
+        <div class="close-btn">&times;</div>
+        <button class="nav-btn prev-btn" id="prevBtn">‹</button>
+        <button class="nav-btn next-btn" id="nextBtn">›</button>
+        
+        <div class="fullscreen-content"></div>
+        
+        <div class="media-info" id="mediaInfo">
+            <div style="font-size:16px; font-weight:bold;" class="media-filename">Filename</div>
+            <div style="font-size:12px; color:#aaa;" class="media-meta">Type • Index</div>
+            <!-- AI Score Details inserted here -->
+            <div class="score-details" id="scoreDetails"></div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="masonry.pkgd.min.js"></script>
+    <script src="imagesloaded.pkgd.min.js"></script>
+
+    <script>
+        // --- GLOBAL VARIABLES ---
+        let allMediaFiles = [];     // List of current viewable files
+        let MEDIA_DATA = {};        // Map: filename -> {url, name, isVideo}
+        let SCORE_DATA = {};        // Map: filename -> {real, cgi, neg} from JSON
+        let FOLDER_MAP = {};        // Map: folderName -> [filenames]
+        
+        let masonry;
+        let loadedMediaCount = 0;
+        const filesPerLoad = 40;
+        let currentMediaIndex = -1;
+        let viewedFiles = new Set();
+        let DIRECTORY = 'Root';
+
+// -- Shutdown function -- //
+
+
+	//SHUTDOWN
+		async function shutdownServer() {
+			if (confirm('Are you sure you want to shutdown the server? This will stop the gallery.')) {
+				try {
+					await fetch('/api/shutdown', { method: 'POST' });
+					// Give server a moment to shutdown, then show message
+					setTimeout(() => {
+						alert('Server is shutting down. You can close this tab.');
+					}, 1000);
+				} catch (error) {
+					// This error is expected since the server will stop responding
+					console.log('Server shutdown initiated');
+				}
+			}
+		}
+        // --- INITIALIZATION ---
+		
+		async function getServerDirectory() {
+			try {
+				const response = await fetch('/api/directory');
+				const data = await response.json();
+				DIRECTORY = data.directory;
+			} catch (e) {
+				console.warn("Could not get server directory", e);
+			}
+		}
+
+        async function initializeGallery() {
+			await getServerDirectory(); 
+            const grid = document.querySelector('.grid');
+            grid.innerHTML = '<div class="loading">Loading files & AI scores...</div>';
+            
+            try {
+                // 1. Fetch AI Scores
+                try {
+                    const scoreRes = await fetch('image_scores.json?t=' + Date.now()); // timestamp prevents caching
+                    if (scoreRes.ok) {
+                        const rawScores = await scoreRes.json();
+                        // Normalize keys to just filenames for easier matching
+                        // The JSON likely has full paths. We map "filename.ext" -> ScoreObj
+                        SCORE_DATA = {};
+                        for (const [path, score] of Object.entries(rawScores)) {
+                            // Fix Windows slashes
+                            const normalizedPath = path.replace(/\\/g, '/'); 
+                            const filename = normalizedPath.split('/').pop();
+                            SCORE_DATA[filename] = score;
+                        }
+                        console.log(`Loaded ${Object.keys(SCORE_DATA).length} scores.`);
+                    }
+                } catch (e) {
+                    console.warn("Could not load image_scores.json", e);
+                }
+
+                // 2. Fetch File List
+                const response = await fetch('/api/files');
+                if (!response.ok) throw new Error("API Error");
+                const fileList = await response.json();
+                
+                // 3. Process Data
+                FOLDER_MAP = { 'all': [] };
+                MEDIA_DATA = {};
+                
+                fileList.forEach(file => {
+                    const path = file.path; // relative path from server root
+                    const filename = path.split('/').pop(); // Just the name
+                    
+                    MEDIA_DATA[path] = {
+                        url: '/media/' + path,
+                        name: file.name,
+                        isVideo: file.isVideo,
+                        filename: filename // Store bare filename for matching scores
+                    };
+                    
+                    FOLDER_MAP['all'].push(path);
+                    
+                    // Folder grouping logic
+                    const parts = path.split('/');
+                    if (parts.length > 1) {
+                        const folder = parts.slice(0, -1).join('/');
+                        if (!FOLDER_MAP[folder]) FOLDER_MAP[folder] = [];
+                        FOLDER_MAP[folder].push(path);
+                    }
+                });
+
+                populateFolderFilter();
+                filterGalleryByFolder();
+
+            } catch (error) {
+                grid.innerHTML = `<div class="loading">Error: ${error.message}</div>`;
+                console.error(error);
+            }
+        }
+
+        // --- CORE LOGIC: DETERMINE KEEP/DISCARD ---
+        function getAiStatus(filename) {
+            const scores = SCORE_DATA[filename];
+            if (!scores) return 'unscored';
+
+            const cThresh = parseFloat(document.getElementById('contentThresh').value);
+            const nThresh = parseFloat(document.getElementById('negThresh').value);
+
+            const isGood = (scores.real > cThresh) || (scores.cgi > cThresh);
+            const isNotTrash = scores.neg < nThresh;
+
+            if (isGood && isNotTrash) return 'keep';
+            return 'discard';
+        }
+
+        // --- FILTERING ---
+        function filterGalleryByFolder() {
+            const folderSelect = document.getElementById('folderFilter');
+            const scoreSelect = document.getElementById('scoreFilter');
+            
+            const folderName = folderSelect.value;
+            const scoreMode = scoreSelect.value; // all, keep, discard, unscored
+
+            const folderDisplay = folderName === 'all' ? DIRECTORY.split('/').pop() || 'Root' : folderName;
+				document.getElementById('folderName').textContent = folderDisplay;
+
+            // 1. Get files from folder
+            let candidateFiles = FOLDER_MAP[folderName] || [];
+
+            // 2. Filter by AI Score Status
+            if (scoreMode !== 'all') {
+                candidateFiles = candidateFiles.filter(path => {
+                    const filename = MEDIA_DATA[path].filename;
+                    const status = getAiStatus(filename);
+                    return status === scoreMode;
+                });
+            }
+
+            // 3. Reset Grid
+            if (masonry) { masonry.destroy(); masonry = null; }
+            document.querySelector('.grid').innerHTML = '';
+            
+            allMediaFiles = candidateFiles;
+            loadedMediaCount = 0;
+            
+            document.getElementById('totalCount').textContent = allMediaFiles.length;
+            updateAICounters();
+			loadMoreMedia();
+        }
+
+        // --- RECALCULATE (When threshold changes) ---
+        function updateAICounters() {
+			const keepCount = document.getElementById('keepCount');
+			const discardCount = document.getElementById('discardCount');
+			
+			let keep = 0;
+			let discard = 0;
+			
+			allMediaFiles.forEach(path => {
+				const filename = MEDIA_DATA[path].filename;
+				const status = getAiStatus(filename);
+				if (status === 'keep') keep++;
+				if (status === 'discard') discard++;
+			});
+			
+			keepCount.textContent = keep;
+			discardCount.textContent = discard;
+		}
+		
+		
+		
+		function recalcScores() {
+            // Re-apply classes to existing grid items without reloading images
+            // But if we are filtering by score, we must reload the list.
+            const scoreMode = document.getElementById('scoreFilter').value;
+            
+            if (scoreMode !== 'all') {
+                filterGalleryByFolder(); // Full reload needed to add/remove items
+            } else {
+                // Just update visual styling in place (faster)
+                const gridItems = document.querySelectorAll('.grid-item');
+                gridItems.forEach(item => {
+                    const filename = item.dataset.filename;
+                    const status = getAiStatus(filename);
+                    
+                    // Remove old classes
+                    item.classList.remove('status-keep', 'status-discard');
+                    const badge = item.querySelector('.ai-badge');
+                    if (badge) badge.remove();
+
+                    // Add new classes
+                    if (status !== 'unscored') {
+                        item.classList.add(`status-${status}`);
+                        const newBadge = document.createElement('div');
+                        newBadge.className = `ai-badge ${status}`;
+                        newBadge.innerText = status.toUpperCase();
+                        item.appendChild(newBadge);
+                    }
+                });
+            }
+			updateAICounters();
+        }
+
+        // --- GRID RENDERING ---
+        function createGridItem(path) {
+            const media = MEDIA_DATA[path];
+            const status = getAiStatus(media.filename);
+
+            const div = document.createElement('div');
+            div.className = 'grid-item';
+            div.style.width = document.getElementById('thumbnailWidth').value + 'px';
+            div.dataset.filename = media.filename; // Store for easy access
+
+            if (status !== 'unscored') {
+                div.classList.add(`status-${status}`);
+                div.innerHTML += `<div class="ai-badge ${status}">${status.toUpperCase()}</div>`;
+            }
+
+            const imgOrVideo = media.isVideo ? document.createElement('video') : document.createElement('img');
+            imgOrVideo.src = media.url;
+            imgOrVideo.loading = 'lazy';
+            if (media.isVideo) { imgOrVideo.muted = true; imgOrVideo.preload = 'metadata'; }
+            
+            div.appendChild(imgOrVideo);
+            
+            // Info Overlay
+            div.innerHTML += `
+                <div class="item-info">
+                    <div style="font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${media.name}</div>
+                    <div style="font-size:10px; color:#aaa;">${media.isVideo ? 'VIDEO' : 'IMAGE'}</div>
+                </div>
+            `;
+
+            div.onclick = () => openFullscreen(path);
+            return div;
+        }
+
+        function appendMediaToGrid(files) {
+            const grid = document.querySelector('.grid');
+            const elements = files.map(createGridItem);
+            grid.append(...elements);
+
+            if (masonry) {
+                masonry.appended(elements);
+                imagesLoaded(elements, () => masonry.layout());
+            } else {
+                imagesLoaded(elements, () => {
+                    if (!masonry) {
+                        masonry = new Masonry(grid, {
+                            itemSelector: '.grid-item',
+                            columnWidth: parseInt(document.getElementById('thumbnailWidth').value),
+                            gutter: 15,
+                            fitWidth: true
+                        });
+                    }
+                });
+            }
+            loadedMediaCount += files.length;
+            document.getElementById('loadedCount').textContent = loadedMediaCount;
+        }
+
+        function loadMoreMedia() {
+            const next = allMediaFiles.slice(loadedMediaCount, loadedMediaCount + filesPerLoad);
+            if (next.length > 0) appendMediaToGrid(next);
+        }
+
+        // --- FULLSCREEN LOGIC ---
+        function openFullscreen(path) {
+            currentMediaIndex = allMediaFiles.indexOf(path);
+            const overlay = document.getElementById('fullscreenOverlay');
+            const content = document.querySelector('.fullscreen-content');
+            const media = MEDIA_DATA[path];
+
+            content.innerHTML = '';
+            const el = media.isVideo ? document.createElement('video') : document.createElement('img');
+            el.src = media.url;
+            if (media.isVideo) { el.controls = true; el.autoplay = true; }
+            content.appendChild(el);
+
+            // Update Info & Scores
+            const status = getAiStatus(media.filename);
+            const scores = SCORE_DATA[media.filename];
+            const infoBox = document.getElementById('mediaInfo');
+            
+            // Color code the info box
+            infoBox.classList.remove('info-keep', 'info-discard');
+            if (status !== 'unscored') infoBox.classList.add(`info-${status}`);
+
+            document.querySelector('.media-filename').textContent = media.name;
+            document.querySelector('.media-meta').textContent = `${media.isVideo?'Video':'Image'} • ${currentMediaIndex+1}/${allMediaFiles.length}`;
+
+            // Show Score Details
+            const det = document.getElementById('scoreDetails');
+            if (scores) {
+                const cThresh = parseFloat(document.getElementById('contentThresh').value);
+                const nThresh = parseFloat(document.getElementById('negThresh').value);
+                
+                det.innerHTML = `
+                    <div>Realism: <span class="score-val ${scores.real>cThresh?'score-good':''}">${scores.real.toFixed(2)}</span></div>
+                    <div>CGI: <span class="score-val ${scores.cgi>cThresh?'score-good':''}">${scores.cgi.toFixed(2)}</span></div>
+                    <div>Negative: <span class="score-val ${scores.neg<nThresh?'score-good':'score-bad'}">${scores.neg.toFixed(2)}</span></div>
+                    <div style="grid-column: span 2; margin-top:5px; font-weight:bold; color:${status=='keep'?'#4CAF50':(status=='discard'?'#F44336':'#888')}">
+                        DECISION: ${status.toUpperCase()}
+                    </div>
+                `;
+            } else {
+                det.innerHTML = `<div style="grid-column:span 2; color:#666;">No AI Score Data</div>`;
+            }
+
+            overlay.classList.add('visible');
+        }
+
+        function closeFullscreen() {
+            document.getElementById('fullscreenOverlay').classList.remove('visible');
+            const video = document.querySelector('.fullscreen-content video');
+            if(video) video.pause();
+        }
+
+        function navigate(dir) {
+            const newIndex = currentMediaIndex + dir;
+            if (newIndex >= 0 && newIndex < allMediaFiles.length) {
+                openFullscreen(allMediaFiles[newIndex]);
+            }
+        }
+
+        // --- UTILS & LISTENERS ---
+        function populateFolderFilter() {
+            const sel = document.getElementById('folderFilter');
+            sel.innerHTML = '<option value="all">All Folders</option>';
+            Object.keys(FOLDER_MAP).sort().forEach(key => {
+                if (key === 'all') return;
+                sel.innerHTML += `<option value="${key}">${key} (${FOLDER_MAP[key].length})</option>`;
+            });
+        }
+
+        // Inputs
+        document.getElementById('thumbnailWidth').oninput = (e) => {
+            const w = e.target.value + 'px';
+            document.querySelectorAll('.grid-item').forEach(el => el.style.width = w);
+            if (masonry) { masonry.options.columnWidth = parseInt(e.target.value); masonry.layout(); }
+        };
+
+        // Infinite Scroll
+        window.onscroll = () => {
+            if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 500) {
+                loadMoreMedia();
+            }
+        };
+
+        // Close Overlay
+        document.querySelector('.close-btn').onclick = closeFullscreen;
+        document.getElementById('prevBtn').onclick = (e) => { e.stopPropagation(); navigate(-1); };
+        document.getElementById('nextBtn').onclick = (e) => { e.stopPropagation(); navigate(1); };
+        
+        // Key events
+        document.onkeydown = (e) => {
+            if (!document.getElementById('fullscreenOverlay').classList.contains('visible')) return;
+            if (e.key === 'ArrowRight') navigate(1);
+            if (e.key === 'ArrowLeft') navigate(-1);
+            if (e.key === 'Escape') closeFullscreen();
+        };
+
+        // Start
+        initializeGallery();
+	
+
+    </script>
+</body>
+</html>
