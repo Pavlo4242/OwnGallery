@@ -1,4 +1,6 @@
 #include <windows.h>
+#include <io.h>
+#include <fcntl.h>
 #include <rpc.h> // Required for UuidCreate function prototype
 #include <stdio.h>
 #include <stdlib.h>
@@ -158,10 +160,38 @@ BOOL StartServer(const char* mediaDir, const char* port) {
         si.wShowWindow = SW_HIDE;
     }
 
+    
+    // Allocate console if /w flag is set
+    if (showConsole) {
+    AllocConsole();
+    freopen("CONOUT$", "w", stdout);
+    freopen("CONOUT$", "w", stderr);
+    
+    // Set console title
+    SetConsoleTitle("Media Browser - Debug Console");
+    
+    printf("Media Browser Launcher - Debug Mode\n");
+    printf("====================================\n");
+    printf("Media Directory: %s\n", currentDir);
+    printf("Port: %s\n", currentPort);
+    printf("Temp Path: %s\n", tempExePath);
+    printf("Server EXE: %s\n", serverExePath);
+    printf("====================================\n\n");
+}
+
+    
+
     char cmdLine[BUFFER_SIZE];
     snprintf(cmdLine, sizeof(cmdLine), "\"%s\" \"%s\" %s nobrowser",
              serverExePath, mediaDir, port);
 
+    if (showConsole) {
+    printf("Starting server process...\n");
+    printf("Command line: %s\n", cmdLine);
+    printf("Working directory: %s\n", tempExePath);
+    fflush(stdout);
+}
+    
     BOOL ok = CreateProcessA(
         NULL, cmdLine, NULL, NULL, FALSE,
         creationFlags, NULL, tempExePath, &si, &pi
@@ -178,6 +208,15 @@ BOOL StartServer(const char* mediaDir, const char* port) {
         MessageBoxA(NULL, msg, "Start Failed", MB_ICONERROR);
         return FALSE;
     }
+
+    if (showConsole) {
+    if (ok) {
+        printf("Server started successfully! PID: %lu\n", pi.dwProcessId);
+    } else {
+        printf("FAILED to start server! Error: %lu\n", GetLastError());
+    }
+    fflush(stdout);
+}
 
     CloseHandle(pi.hThread);
     hServerProcess = pi.hProcess;
@@ -500,10 +539,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     // This line is REQUIRED for the WM_TIMER event to fire:
     SetTimer(hMainWindow, 1, 1000, NULL);
     MSG msg = {0};
+    MSG msg = {0};
     while (GetMessage(&msg, NULL, 0, 0)) {
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
-    }
+    TranslateMessage(&msg);
+    DispatchMessage(&msg);
+}
+
+// If in console mode, wait for key press before exiting
+if (showConsole) {
+    printf("\n\nServer has stopped. Press any key to exit...");
+    getchar();
+}
     
     CloseHandle(hServerProcess);
     CloseHandle(serverProcessInfo.hThread);
