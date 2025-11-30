@@ -62,11 +62,11 @@ jobs:
           go build -ldflags="-s -w -X main.Version=${{ github.ref_name }} -X main.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o server.exe .
           dir
 
-      - name: Upload Go server artifact
+      - name: Upload Go server artifact (as Bin)
         uses: actions/upload-artifact@v4
         with:
           name: server-${{ matrix.platform }}
-          path: server/server.exe
+          path: server/server.bin
           retention-days: 1
 
   build-launcher:
