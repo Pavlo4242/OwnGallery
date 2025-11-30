@@ -119,7 +119,7 @@ jobs:
         run: |
           cd launcher
           gcc -v
-          gcc -O3 -s -static -mwindows -o ..\${{ matrix.output }} launcher.c resource.res -lshlwapi -lole32
+          gcc -O3 -s -static -mwindows -o ..\${{ matrix.output }} launcher.c resource.res -lshlwapi -lole32 -lrpcrt4
           if errorlevel 1 exit /b 1
           cd ..
           dir
@@ -197,8 +197,8 @@ jobs:
             ## Media Gallery Launcher ${{ github.ref_name }}
             
             ### 📥 Downloads
-            - **Windows (x64)**: MediaGallery.exe
-            - **Windows (ARM64)**: MediaGallery-arm64.exe
+            - **Windows (x64)**: MediaFuckNugget.exe
+            - **Windows (ARM64)**: MediaBrowser-arm64.exe
             
             ### ✨ Features
             - 🚀 Single executable - no installation needed
