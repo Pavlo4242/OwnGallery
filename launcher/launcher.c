@@ -164,8 +164,8 @@ BOOL StartServer(const char* mediaDir, const char* port) {
 
     BOOL ok = CreateProcessA(
         NULL, cmdLine, NULL, NULL, FALSE,
-        creationFlags, NULL, NULL, &si, &pi
-    );
+      creationFlags, NULL, tempExePath, &si, &pi
+);
 
     if (!ok) {
         char msg[1024];
