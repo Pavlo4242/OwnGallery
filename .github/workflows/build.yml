@@ -196,7 +196,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           name: Release ${{ github.ref_name }}
-         body: |
+          body: |
             ## Media Gallery Launcher ${{ github.ref_name }} (Build ${{ github.run_number }})
             
             ### 📥 Downloads
