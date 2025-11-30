@@ -199,26 +199,53 @@ func setupRoutes(mediaDir string) {
 	http.Handle("/media/", activityMiddleware(corsMiddleware(
 		http.StripPrefix("/media/", http.FileServer(http.Dir(mediaDir))))))
 
-	// API endpoint for file list (with details)
+	// ──────────────────────────────────────────────────────────────
+	// API – File listing & sources
+	// ──────────────────────────────────────────────────────────────
 	http.HandleFunc("/api/files", func(w http.ResponseWriter, r *http.Request) {
 		updateActivity()
-		source := r.URL.Query().Get("source") // Get requested source
+
+		source := r.URL.Query().Get("source")
+		format := r.URL.Query().Get("format") // Add format parameter
+
 		files, directories, err := getDetailedFileListAndFolders(mediaDir, source)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-
-		response := ApiResponse{
-			Files:       files,
-			Directories: directories,
+		// Support different response formats
+		switch format {
+		case "simple":
+			var paths []string
+			for _, file := range files {
+				paths = append(paths, file.Path)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(paths)
+		case "minimal":
+			type MinimalFile struct {
+				Path    string `json:"path"`
+				IsVideo bool   `json:"isVideo"`
+			}
+			var minimalFiles []MinimalFile
+			for _, file := range files {
+				minimalFiles = append(minimalFiles, MinimalFile{
+					Path:    file.Path,
+					IsVideo: file.IsVideo,
+				})
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(minimalFiles)
+		default:
+			response := ApiResponse{
+				Files:       files,
+				Directories: directories,
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(response)
 		}
-		
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
 	})
 
-	// API to list available data sources (JSON files)
 	http.HandleFunc("/api/sources", func(w http.ResponseWriter, r *http.Request) {
 		updateActivity()
 		matches, _ := filepath.Glob(filepath.Join(mediaDir, "*.json"))
@@ -229,9 +256,34 @@ func setupRoutes(mediaDir string) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(sources)
 	})
-	
-	
-		http.HandleFunc("/api/root_dir", func(w http.ResponseWriter, r *http.Request) {
+
+	// ──────────────────────────────────────────────────────────────
+	// API – Direct JSON / directory info
+	// ──────────────────────────────────────────────────────────────
+	http.HandleFunc("/api/json/", func(w http.ResponseWriter, r *http.Request) {
+		updateActivity()
+		jsonFile := strings.TrimPrefix(r.URL.Path, "/api/json/")
+		jsonPath := filepath.Join(mediaDir, jsonFile)
+
+		if strings.Contains(jsonFile, "..") || strings.Contains(jsonFile, "/") {
+			http.Error(w, "Invalid path", http.StatusBadRequest)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "no-cache")
+		http.ServeFile(w, r, jsonPath)
+	})
+
+	http.HandleFunc("/api/directory", func(w http.ResponseWriter, r *http.Request) {
+		updateActivity()
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{
+			"directory": mediaDir,
+		})
+	})
+
+	http.HandleFunc("/api/root_dir", func(w http.ResponseWriter, r *http.Request) {
 		updateActivity()
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{
@@ -239,6 +291,9 @@ func setupRoutes(mediaDir string) {
 		})
 	})
 
+	// ──────────────────────────────────────────────────────────────
+	// API – Utility endpoints
+	// ──────────────────────────────────────────────────────────────
 	http.HandleFunc("/api/open_explorer", func(w http.ResponseWriter, r *http.Request) {
 		updateActivity()
 		err := openFileExplorer(mediaDir)
@@ -252,13 +307,57 @@ func setupRoutes(mediaDir string) {
 	http.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
 		updateActivity()
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{
-			"status":  "ok",
-			"version": Version,
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":     "ok",
+			"version":    Version,
+			"directory":  mediaDir,
+			"sources":    getAvailableSources(mediaDir),
+			"timestamp":  time.Now().Format(time.RFC3339),
 		})
 	})
 
+	// ──────────────────────────────────────────────────────────────
+	// API – Admin / shutdown
+	// ──────────────────────────────────────────────────────────────
+	http.HandleFunc("/api/quit", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		w.Write([]byte("Server shutting down..."))
+		go func() {
+			time.Sleep(500 * time.Millisecond)
+			os.Exit(0)
+		}()
+	})
 
+	http.HandleFunc("/api/shutdown", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{
+			"status":  "shutting_down",
+			"message": "Server will shutdown shortly",
+		})
+
+		go func() {
+			time.Sleep(500 * time.Millisecond)
+			os.Exit(0)
+		}()
+	})
+}
+
+func getAvailableSources(mediaDir string) []string {
+    matches, _ := filepath.Glob(filepath.Join(mediaDir, "*.json"))
+    var sources []string
+    for _, m := range matches {
+        sources = append(sources, filepath.Base(m))
+    }
+    return sources
+}
 	
 http.HandleFunc("/api/quit", func(w http.ResponseWriter, r *http.Request) {
         if r.Method != "POST" {
@@ -272,6 +371,9 @@ http.HandleFunc("/api/quit", func(w http.ResponseWriter, r *http.Request) {
         }()
     })
 }
+
+
+
 
 func getDetailedFileListAndFolders(dir, source string) ([]FileInfo, []string, error) {
     // 1. Automatic Priority: If no source specified, check for priority manifests
@@ -351,28 +453,28 @@ func getDetailedFileListAndFolders(dir, source string) ([]FileInfo, []string, er
 
 // loadFromManifest reads a pre-generated JSON manifest and handles multiple formats
 func loadFromManifest(baseDir, manifestPath string) ([]FileInfo, []string, error) {
-	data, err := os.ReadFile(manifestPath)
-	if err != nil {
-		return nil, nil, err
-	}
+    data, err := os.ReadFile(manifestPath)
+    if err != nil {
+        return nil, nil, err
+    }
 
     // Flexible structure to handle "files" (standard) or "gallery" (clustering output) keys
-	var rawData struct {
-		Files []struct {
-			Path     string `json:"path"`
-			Name     string `json:"name"`
+    var rawData struct {
+        Files []struct {
+            Path     string `json:"path"`
+            Name     string `json:"name"`
             Filename string `json:"filename"` // Handle 'filename' vs 'name'
-		} `json:"files"`
+        } `json:"files"`
         Gallery []struct {
-			Path     string `json:"path"`
+            Path     string `json:"path"`
             Filename string `json:"filename"`
-		} `json:"gallery"`
+        } `json:"gallery"`
         Directories []string `json:"directories"`
-	}
+    }
 
-	if err := json.Unmarshal(data, &rawData); err != nil {
-		return nil, nil, err
-	}
+    if err := json.Unmarshal(data, &rawData); err != nil {
+        return nil, nil, err
+    }
 
     // Standardize the list
     var fileList []FileInfo
@@ -402,14 +504,14 @@ func loadFromManifest(baseDir, manifestPath string) ([]FileInfo, []string, error
         for _, d := range dirList { seenDirs[filepath.ToSlash(d)] = true }
     }
 
-	for _, item := range sourceList {
+    for _, item := range sourceList {
         // Fix path: remove absolute prefix if present (common in Python scripts)
         relPath := item.Path
         // Basic check if path contains baseDir, strip it
         if strings.Contains(relPath, baseDir) {
             relPath, _ = filepath.Rel(baseDir, relPath)
         }
-		relPath = filepath.ToSlash(relPath)
+        relPath = filepath.ToSlash(relPath)
         
         // Handle name
         name := item.Name
@@ -424,7 +526,7 @@ func loadFromManifest(baseDir, manifestPath string) ([]FileInfo, []string, error
         ext := strings.ToLower(filepath.Ext(name))
         isVideo := extensions[ext]
 
-		fileList = append(fileList, FileInfo{
+        fileList = append(fileList, FileInfo{
             Path: relPath,
             Name: name,
             Size: info.Size(),
@@ -441,10 +543,11 @@ func loadFromManifest(baseDir, manifestPath string) ([]FileInfo, []string, error
                 dirList = append(dirList, d)
             }
         }
-	}
+    }
     
-	return fileList, dirList, nil
+    return fileList, dirList, nil
 }
+
 
 func generateOrLoadCertificate() (tls.Certificate, error) {
 	certFile := filepath.Join(os.TempDir(), "mediabrowser_cert.pem")
