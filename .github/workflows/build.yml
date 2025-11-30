@@ -69,21 +69,20 @@ jobs:
           path: server/server.exe
           retention-days: 1
 
-  build-launcher:
-    name: Build Launcher for ${{ matrix.platform }}
-    needs: build-go-server
-    runs-on: windows-latest
-    strategy:
-      matrix:
-        include:
-          - platform: windows-amd64
-            output: MediaBrowser.exe
-            goarch: amd64
-          - platform: windows-arm64
-            output: MediaBrowser-arm64.exe
-            goarch: arm64
-
-    steps:
+      - name: Build launcher (x64)
+        shell: bash
+        run: |
+          cd launcher
+          gcc --version
+          gcc -O3 -s -static -mwindows \
+              -o ../MediaBrowser.exe launcher.c resource.res \
+              -lshlwapi -lole32 -lshell32 -lcomdlg32 -ladvapi32 \
+              -Wl,--high-entropy-va,--dynamicbase,--nxcompat \
+              -Wl,--large-address-aware
+          cd ..
+          ls -lh *.exe
+        
+steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
