@@ -20,13 +20,13 @@ BEGIN
     BEGIN
         BLOCK "040904b0"
         BEGIN
-            VALUE "CompanyName", "Media Gallery"
-            VALUE "FileDescription", "Local Media Gallery Launcher"
+            VALUE "CompanyName", "Media Browser"
+            VALUE "FileDescription", "Local Media Browser Launcher"
             VALUE "FileVersion", "1.0.0.0"
-            VALUE "InternalName", "MediaGallery"
+            VALUE "InternalName", "MediaBrowser"
             VALUE "LegalCopyright", "Open Source MIT License"
-            VALUE "OriginalFilename", "MediaGallery.exe"
-            VALUE "ProductName", "Media Gallery Launcher"
+            VALUE "OriginalFilename", "MediaBrowser.exe"
+            VALUE "ProductName", "Media Browser Launcher"
             VALUE "ProductVersion", "1.0.0.0"
         END
     END
