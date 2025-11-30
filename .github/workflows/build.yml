@@ -76,10 +76,10 @@ jobs:
       matrix:
         include:
           - platform: windows-amd64
-            output: MediaGallery.exe
+            output: MediaBrowser.exe
             goarch: amd64
           - platform: windows-arm64
-            output: MediaGallery-arm64.exe
+            output: MediaBrowser-arm64.exe
             goarch: arm64
 
     steps:
@@ -139,7 +139,7 @@ jobs:
           @"
           Media Gallery Launcher
           ======================
-          
+          This Version is to work with JSONs -- 
           Usage:
           1. Copy this executable to any folder containing images/videos
           2. Double-click to launch
@@ -156,6 +156,7 @@ jobs:
           - Mouse wheel: Adjust speed
           
           Version: ${{ github.ref_name }}
+          Github Run ${{ $GITHUB_RUN_NUMBER}}
           Built: $(Get-Date -Format "yyyy-MM-dd HH:mm") UTC
           "@ | Out-File -FilePath dist\README.txt -Encoding UTF8
 
@@ -171,6 +172,14 @@ jobs:
           name: ${{ matrix.output }}
           path: dist/*
           retention-days: 30
+
+      - name: Print Short SHA
+        # This uses bash string slicing to get the first 7 characters
+        run: echo "Short SHA: ${GITHUB_SHA::7}"
+        
+      - name: Print Run number
+        run: echo "This is build number: $GITHUB_RUN_NUMBER"
+
 
   release:
     name: Create Release
@@ -193,7 +202,7 @@ jobs:
         with:
           name: Release ${{ github.ref_name }}
           body: |
-            ## Media Gallery Launcher ${{ github.ref_name }}
+            ## Media Gallery Launcher ${{ github.ref_name }{$GITHUB_RUN_NUMBER}}
             
             ### 📥 Downloads
             - **Windows (x64)**: MediaGallery.exe
