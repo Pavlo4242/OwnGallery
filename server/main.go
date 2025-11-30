@@ -258,17 +258,6 @@ func setupRoutes(mediaDir string) {
 		})
 	})
 
-	// API to list available data sources (JSON files)
-http.HandleFunc("/api/sources", func(w http.ResponseWriter, r *http.Request) {
-	updateActivity()
-	matches, _ := filepath.Glob(filepath.Join(mediaDir, "*.json"))
-	var sources []string
-	for _, m := range matches {
-		sources = append(sources, filepath.Base(m))
-	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(sources)
-})
 
 	
 http.HandleFunc("/api/quit", func(w http.ResponseWriter, r *http.Request) {
