@@ -173,8 +173,8 @@ BOOL StartServer(const char* mediaDir, const char* port) {
     }
 
     char cmdLine[BUFFER_SIZE];
-    snprintf(cmdLine, sizeof(cmdLine), "\"%s\" \"%s\" %s nobrowser",
-             serverExePath, mediaDir, port);
+    snprintf(cmdLine, sizeof(cmdLine), "cmd /c \"%s\" \"%s\" %s nobrowser", 
+         serverExePath, mediaDir, port);
 
     BOOL ok = CreateProcessA(
         NULL, cmdLine, NULL, NULL, FALSE,
@@ -473,8 +473,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     CreateDirectory(tempExePath, NULL);
 
     // Always use a fully unique server exe name
-    snprintf(serverExePath, sizeof(serverExePath), "%sserver_%08x%04x.exe", 
-             tempExePath, GetTickCount(), uuid.Data4[0] << 8 | uuid.Data4[1]);
+   snprintf(serverExePath, sizeof(serverExePath), "%sserver.bin", tempExePath);
+
+
 
     if (!ExtractServerBinary(serverExePath)) {
         char errMsg[512];
