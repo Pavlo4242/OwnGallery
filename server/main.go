@@ -257,6 +257,20 @@ func setupRoutes(mediaDir string) {
 			"version": Version,
 		})
 	})
+
+	// API to list available data sources (JSON files)
+http.HandleFunc("/api/sources", func(w http.ResponseWriter, r *http.Request) {
+	updateActivity()
+	matches, _ := filepath.Glob(filepath.Join(mediaDir, "*.json"))
+	var sources []string
+	for _, m := range matches {
+		sources = append(sources, filepath.Base(m))
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(sources)
+})
+
+	
 http.HandleFunc("/api/quit", func(w http.ResponseWriter, r *http.Request) {
         if r.Method != "POST" {
             http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -275,65 +289,62 @@ func getDetailedFileListAndFolders(dir, source string) ([]FileInfo, []string, er
 	if source != "" && source != "disk" {
 		manifestPath := filepath.Join(dir, source)
 		if _, err := os.Stat(manifestPath); err == nil {
-			log.Printf("Loading requested manifest: %s", source)
+			log.Printf("📄 Loading requested manifest: %s", source)
 			return loadFromManifest(dir, manifestPath)
 		}
 	}
 
 	// 2. Fallback/Default: Walk directory (Disk Scan)
-	log.Println("Scanning directory structure...")
+	log.Println("📂 Scanning directory structure...")
 	extensions := map[string]bool{
 		".jpg": false, ".jpeg": false, ".png": false, ".webp": false,
 		".gif": false, ".mp4": true, ".webm": true, ".ogg": true,
 		".bmp": false, ".svg": false, ".mov": true, ".avi": true,
-        ".jpg": false, ".jpeg": false, ".png": false, ".webp": false,
-        ".gif": false, ".mp4": true, ".webm": true, ".ogg": true,
-        ".bmp": false, ".svg": false, ".mov": true, ".avi": true,
-    }
+	}
 
-    var files []FileInfo
-    var directories []string // New list for directories
-    
-    err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-        // If there is an error accessing the path (e.g. permission denied), skip it
-        if err != nil {
-            log.Printf("⚠️ Error accessing path %q: %v", path, err)
-            if info != nil && info.IsDir() {
-                return filepath.SkipDir
-            }
-            return nil
-        }
+	var files []FileInfo
+	var directories []string // New list for directories
+	
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		// If there is an error accessing the path (e.g. permission denied), skip it
+		if err != nil {
+			log.Printf("⚠️ Error accessing path %q: %v", path, err)
+			if info != nil && info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
 
-        if strings.HasPrefix(info.Name(), ".") { // Skip hidden files/folders
-            return nil // Skip hidden files
-        }
+		if strings.HasPrefix(info.Name(), ".") { // Skip hidden files/folders
+			return nil // Skip hidden files
+		}
 
-        // If it's a directory, add its relative path to the list
-        if info.IsDir() {
-            // Don't add the root directory itself, only subdirectories
-            if path != dir {
-                relPath, _ := filepath.Rel(dir, path)
-                directories = append(directories, filepath.ToSlash(relPath))
-            }
-            return nil // Continue walking
-        }
+		// If it's a directory, add its relative path to the list
+		if info.IsDir() {
+			// Don't add the root directory itself, only subdirectories
+			if path != dir {
+				relPath, _ := filepath.Rel(dir, path)
+				directories = append(directories, filepath.ToSlash(relPath))
+			}
+			return nil // Continue walking
+		}
 
-        // Existing logic for processing files
-        ext := strings.ToLower(filepath.Ext(path))
-        if isVideo, exists := extensions[ext]; exists {
-            relPath, _ := filepath.Rel(dir, path)
-            files = append(files, FileInfo{
-                Path:     filepath.ToSlash(relPath),
-                Name:     info.Name(),
-                Size:     info.Size(),
-                Modified: info.ModTime().Format(time.RFC3339),
-                IsVideo:  isVideo,
-            })
-        }
-        return nil
-    })
+		// Existing logic for processing files
+		ext := strings.ToLower(filepath.Ext(path))
+		if isVideo, exists := extensions[ext]; exists {
+			relPath, _ := filepath.Rel(dir, path)
+			files = append(files, FileInfo{
+				Path:     filepath.ToSlash(relPath),
+				Name:     info.Name(),
+				Size:     info.Size(),
+				Modified: info.ModTime().Format(time.RFC3339),
+				IsVideo:  isVideo,
+			})
+		}
+		return nil
+	})
 
-    return files, directories, err
+	return files, directories, err
 }
 
 // loadFromManifest reads a pre-generated JSON manifest and returns the same structure expected by the API
