@@ -1,6 +1,4 @@
 #include <windows.h>
-#include <io.h>
-#include <fcntl.h>
 #include <rpc.h> // Required for UuidCreate function prototype
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,6 +6,8 @@
 #include <shellapi.h>
 #include <shlobj.h>
 #include <time.h>
+#include <io.h>
+#include <fcntl.h>
 
 // Definitions
 #define MAX_RETRIES 3
@@ -154,48 +154,37 @@ BOOL StartServer(const char* mediaDir, const char* port) {
         creationFlags = CREATE_NEW_CONSOLE | CREATE_NEW_PROCESS_GROUP;
         si.dwFlags = STARTF_USESHOWWINDOW;
         si.wShowWindow = SW_SHOW;
+        
+        // Debug output
+        printf("Starting server process...\n");
+        printf("Command line: %s\n", serverExePath);
+        printf("Media directory: %s\n", mediaDir);
+        printf("Port: %s\n", port);
+        printf("Working directory: %s\n", tempExePath);
+        fflush(stdout);
     } else {
         creationFlags = CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP;
         si.dwFlags = STARTF_USESHOWWINDOW;
         si.wShowWindow = SW_HIDE;
     }
 
-    
-    // Allocate console if /w flag is set
-    if (showConsole) {
-    AllocConsole();
-    freopen("CONOUT$", "w", stdout);
-    freopen("CONOUT$", "w", stderr);
-    
-    // Set console title
-    SetConsoleTitle("Media Browser - Debug Console");
-    
-    printf("Media Browser Launcher - Debug Mode\n");
-    printf("====================================\n");
-    printf("Media Directory: %s\n", currentDir);
-    printf("Port: %s\n", currentPort);
-    printf("Temp Path: %s\n", tempExePath);
-    printf("Server EXE: %s\n", serverExePath);
-    printf("====================================\n\n");
-}
-
-    
-
     char cmdLine[BUFFER_SIZE];
     snprintf(cmdLine, sizeof(cmdLine), "\"%s\" \"%s\" %s nobrowser",
              serverExePath, mediaDir, port);
 
-    if (showConsole) {
-    printf("Starting server process...\n");
-    printf("Command line: %s\n", cmdLine);
-    printf("Working directory: %s\n", tempExePath);
-    fflush(stdout);
-}
-    
     BOOL ok = CreateProcessA(
         NULL, cmdLine, NULL, NULL, FALSE,
         creationFlags, NULL, tempExePath, &si, &pi
     );
+
+    if (showConsole) {
+        if (ok) {
+            printf("Server started successfully! PID: %lu\n", pi.dwProcessId);
+        } else {
+            printf("FAILED to start server! Error: %lu\n", GetLastError());
+        }
+        fflush(stdout);
+    }
 
     if (!ok) {
         char msg[1024];
@@ -208,15 +197,6 @@ BOOL StartServer(const char* mediaDir, const char* port) {
         MessageBoxA(NULL, msg, "Start Failed", MB_ICONERROR);
         return FALSE;
     }
-
-    if (showConsole) {
-    if (ok) {
-        printf("Server started successfully! PID: %lu\n", pi.dwProcessId);
-    } else {
-        printf("FAILED to start server! Error: %lu\n", GetLastError());
-    }
-    fflush(stdout);
-}
 
     CloseHandle(pi.hThread);
     hServerProcess = pi.hProcess;
@@ -464,6 +444,20 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         LocalFree(argv);
     }
     
+    // Allocate console if /w flag is set - ADDED THIS SECTION
+    if (showConsole) {
+        AllocConsole();
+        freopen("CONOUT$", "w", stdout);
+        freopen("CONOUT$", "w", stderr);
+        
+        // Set console title
+        SetConsoleTitle("Media Browser - Debug Console");
+        
+        printf("Media Browser Launcher - Debug Mode\n");
+        printf("====================================\n");
+        fflush(stdout);
+    }
+    
     // Determine which directory to use
     if (specifiedDir[0] != '\0') {
         if (PathFileExists(specifiedDir) && PathIsDirectory(specifiedDir)) {
@@ -484,6 +478,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         GetCurrentDir(currentDir, sizeof(currentDir));
     }
     
+    if (showConsole) {
+        printf("Media Directory: %s\n", currentDir);
+        printf("Port: %s\n", currentPort);
+        fflush(stdout);
+    }
+    
 // === FIXED: Secure, unique temp directory + exe name ===
     GetTempPath(sizeof(tempExePath), tempExePath);
     
@@ -501,7 +501,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     // Always use a fully unique server exe name
    snprintf(serverExePath, sizeof(serverExePath), "%sserver.exe", tempExePath);
 
-
+    if (showConsole) {
+        printf("Temp Path: %s\n", tempExePath);
+        printf("Server EXE: %s\n", serverExePath);
+        printf("====================================\n\n");
+        fflush(stdout);
+    }
 
     if (!ExtractServerBinary(serverExePath)) {
         char errMsg[512];
@@ -538,18 +543,19 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     Shell_NotifyIcon(NIM_ADD, &nid);
     // This line is REQUIRED for the WM_TIMER event to fire:
     SetTimer(hMainWindow, 1, 1000, NULL);
-    MSG msg = {0};
+    
     MSG msg = {0};
     while (GetMessage(&msg, NULL, 0, 0)) {
-    TranslateMessage(&msg);
-    DispatchMessage(&msg);
-}
-
-// If in console mode, wait for key press before exiting
-if (showConsole) {
-    printf("\n\nServer has stopped. Press any key to exit...");
-    getchar();
-}
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+    
+    // If in console mode, wait for key press before exiting - ADDED THIS
+    if (showConsole) {
+        printf("\n\nServer has stopped. Press any key to exit...");
+        fflush(stdout);
+        getchar();
+    }
     
     CloseHandle(hServerProcess);
     CloseHandle(serverProcessInfo.hThread);
