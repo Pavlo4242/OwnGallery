@@ -457,7 +457,6 @@ func loadFromManifest(baseDir, manifestPath string) ([]FileInfo, []string, error
 	return fileList, dirList, nil
 }
 
-
 func generateOrLoadCertificate() (tls.Certificate, error) {
 	certFile := filepath.Join(os.TempDir(), "mediagallery_cert.pem")
 	keyFile := filepath.Join(os.TempDir(), "mediagallery_key.pem")
@@ -623,3 +622,5 @@ func findEdge() string {
 	}
 	return ""
 }
+
+e
