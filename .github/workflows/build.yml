@@ -59,7 +59,7 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
         run: |
           cd server
-          go build -ldflags="-s -w -X main.Version=${{ github.ref_name }} -X main.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o server.exe .
+          go build -ldflags="-s -w -X main.Version=${{ github.ref_name }} -X main.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o server.bin .
           dir
 
       - name: Upload Go server artifact (as Bin)
