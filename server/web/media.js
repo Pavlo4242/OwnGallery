@@ -1,4 +1,3 @@
-*DOM creation and Grid management.*
 app.media = {
     // Create Media Element (Video/Img)
     createElement(fileName) {
@@ -106,13 +105,24 @@ app.media = {
 
         grid.append(...elements);
 
-        // Masonry Layout (Grid Only)
+        // Masonry Layout (Grid Only) - with fallback
         if (!isListView) {
-            if (app.state.masonry) {
-                app.state.masonry.appended(elements);
-                imagesLoaded(elements, () => app.state.masonry.layout());
+            if (typeof Masonry !== 'undefined' && typeof imagesLoaded !== 'undefined') {
+                if (app.state.masonry) {
+                    app.state.masonry.appended(elements);
+                    imagesLoaded(elements, () => app.state.masonry.layout());
+                } else {
+                    imagesLoaded(elements, () => this.initMasonry());
+                }
+            } else if (typeof Masonry !== 'undefined') {
+                if (app.state.masonry) {
+                    app.state.masonry.appended(elements);
+                    setTimeout(() => app.state.masonry.layout(), 300);
+                } else {
+                    setTimeout(() => this.initMasonry(), 300);
+                }
             } else {
-                imagesLoaded(elements, () => this.initMasonry());
+                document.body.classList.add('masonry-fallback');
             }
         }
         
@@ -145,7 +155,14 @@ app.media = {
 
     initMasonry() {
         const grid = document.querySelector('.grid');
-        if (app.state.masonry) app.state.masonry.destroy();
+        if (app.state.masonry) { app.state.masonry.destroy(); app.state.masonry = null; }
+        
+        if (typeof Masonry === 'undefined') {
+            console.warn('Masonry.js not loaded - using CSS Grid fallback');
+            document.body.classList.add('masonry-fallback');
+            return;
+        }
+        
         app.state.masonry = new Masonry(grid, {
             itemSelector: '.grid-item',
             columnWidth: parseInt(document.getElementById('thumbnailWidth').value),

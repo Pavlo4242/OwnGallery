@@ -4,14 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Media Gallery</title>
-   
-    <!-- Keep existing CSS styles in a separate file or inline here (truncated for brevity, keep your original CSS) -->
-    <style>
-       <link rel="stylesheet" href="style.css">
-
-        body { font-family: sans-serif; margin: 0; background: #0a0a0a; color: #e0e0e0; }
-        .hidden { display: none !important; }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <!-- ============ TOP CONTROLS BAR ============ -->
@@ -24,39 +17,76 @@
     <div class="controls">
         <!-- Sorting Controls -->
         <div class="controls-group sorting-controls">
-            <div class="current-folder" id="currentFolder">📁 <span id="folderName">Loading...</span></div>
-            <div class="file-counter" id="fileCounter">0</div>
+            <div class="current-folder" id="currentFolder" onclick="app.utils.openExplorer()">
+                📁 <span id="folderName">Loading...</span>
+            </div>
+            <div class="file-counter" id="fileCounter">0 files</div>
         </div>
 
-        <!-- Shared Controls -->
+        <!-- Navigation Controls -->
+        <div class="controls-group sorting-controls">
+            <div class="nav-controls">
+                <button id="navBackBtn" onclick="app.gallery.navigateHistory(-1)" disabled>◄</button>
+                <button id="navForwardBtn" onclick="app.gallery.navigateHistory(1)" disabled>►</button>
+            </div>
+        </div>
+
+        <!-- View Controls -->
         <div class="controls-group sorting-controls browsing-controls">
-            <label>Cols:</label> 
-            <input type="range" id="thumbnailWidth" min="150" max="400" value="250">
-            <button onclick="app.main.init()">🔄</button>
+            <div class="view-mode-toggle">
+                <button class="view-mode-btn active" id="gridViewBtn" title="Grid View">⊞</button>
+                <button class="view-mode-btn" id="listViewBtn" title="List View">☰</button>
+            </div>
+        </div>
+
+        <!-- Size Control -->
+        <div class="controls-group sorting-controls browsing-controls">
+            <label>Size:</label> 
+            <input type="range" id="thumbnailWidth" min="150" max="400" value="250" step="10">
+        </div>
+
+        <!-- Filter Controls -->
+        <div class="controls-group sorting-controls">
+            <label>Folder:</label>
+            <select id="folderFilter" onchange="app.gallery.filterByFolder()"></select>
+        </div>
+
+        <!-- Action Controls -->
+        <div class="controls-group sorting-controls browsing-controls">
+            <button onclick="app.gallery.shuffle()" title="Shuffle current view">🔀 Shuffle</button>
+            <button onclick="app.main.init()" title="Refresh gallery">🔄 Refresh</button>
+        </div>
+
+        <!-- Feature Toggles -->
+        <div class="controls-group sorting-controls browsing-controls">
+            <label><input type="checkbox" id="quickPreviewToggle"> Quick Preview</label>
+            <button id="filterFavoritesBtn" onclick="app.utils.filterFavorites()" title="Show favorites only">★ Favorites</button>
+        </div>
+
+        <!-- Multi-Select -->
+        <div class="controls-group sorting-controls" id="multiSelectGroup" style="display:none;">
+            <button id="multiSelectToggle" onclick="app.utils.toggleMultiSelect()">☑ Multi-Select</button>
+            <button id="deleteBtn" class="delete-btn" style="display:none;">🗑 Delete (<span id="selectedCount">0</span>)</button>
         </div>
 
         <!-- Comparing Controls -->
         <div class="controls-group comparing-controls">
             <span style="color:#FF9800; font-weight:bold;">⚖️ Comparing Mode</span>
             <button onclick="app.modes.loadNewComparison()">🔄 New Pair</button>
-            <button onclick="app.modes.markComparison('keep')">✅ Keep Both</button>
-            <button onclick="app.modes.markComparison('discard')">❌ Discard Both</button>
+            <button onclick="app.modes.markComparison('left')">← Keep Left</button>
+            <button onclick="app.modes.markComparison('right')">Keep Right →</button>
+            <button onclick="app.modes.markComparison('both')">✅ Keep Both</button>
+            <button onclick="app.modes.markComparison('neither')">❌ Discard Both</button>
         </div>
 
         <!-- Browsing Controls -->
         <div class="controls-group browsing-controls">
             <button onclick="app.modes.toggleInfo()">ℹ️ Info</button>
-            <button onclick="app.gallery.shuffle()">🔀 Shuffle</button>
         </div>
 
-        <!-- Filter Controls -->
-        <div class="controls-group sorting-controls">
-            <label>Filter:</label>
-            <select id="folderFilter" onchange="app.gallery.filterByFolder()"></select>
-        </div>
-        
+        <!-- Shutdown -->
         <div class="controls-group">
-            <button onclick="app.utils.quitServer()" class="shutdown">⏻ Shutdown</button>
+            <button onclick="app.utils.quitServer()" class="shutdown" title="Stop server and close">⏻ Shutdown</button>
         </div>
     </div>
 
@@ -66,50 +96,60 @@
     </div>
 
     <div id="comparingContent" class="content-area" style="display:none;">
-        <div class="comparing-pair" id="comparisonPair"></div>
+        <div class="comparing-pair" id="comparisonPair">
+            <div class="loading">Loading comparison pairs...</div>
+        </div>
         <div class="comparison-stats">
-            Comparisons: <span id="comparisonCount">0</span> | Decisions: <span id="decisionCount">0</span>
+            <div>Pairs Remaining: <span id="comparisonCount">0</span></div>
+            <div>Decisions Made: <span id="decisionCount">0</span></div>
         </div>
     </div>
 
     <div id="browsingContent" class="content-area" style="display:none;">
         <div class="browsing-info-panel" id="browsingInfoPanel" style="display:none;">
-            <h4>📊 Gallery Info</h4>
-            <div>Total: <span id="browseTotalCount">0</span></div>
-            <div>Unique Scenes: <span id="browseSceneCount">0</span></div>
+            <h4>📊 Gallery Statistics</h4>
+            <div>Total Files: <span id="browseTotalCount">0</span></div>
+            <div>Images: <span id="browseImageCount">0</span></div>
+            <div>Videos: <span id="browseVideoCount">0</span></div>
+            <div>Folders: <span id="browseFolderCount">0</span></div>
         </div>
         <div class="grid" id="browsingGrid"></div>
     </div>
 
-    <!-- ============ OVERLAYS & UTILS ============ -->
+    <!-- ============ UI OVERLAYS ============ -->
     <div id="galleryDir" class="gallery-dir"></div>
-    <div class="scroll-progress">Loaded: <span id="loadedCount">0</span> / <span id="totalCount">0</span></div>
+    <div class="scroll-progress">
+        <span id="loadedCount">0</span> / <span id="totalCount">0</span>
+    </div>
 
     <!-- Fullscreen Overlay -->
     <div id="fullscreenOverlay" class="fullscreen-overlay">
         <span class="top-left-close" onclick="app.fullscreen.close()">&times;</span>
-        <div id="fullscreenDir" class="fullscreen-dir"></div>
-        <select id="fullscreenFolderSelect" class="fullscreen-folder-select" onchange="app.gallery.jumpToFolder(this.value)"></select>
         
-        <span class="close-btn" onclick="app.fullscreen.close()">&times;</span>
-        <button class="nav-btn prev-btn" id="prevBtn">‹</button>
-        <button class="nav-btn next-btn" id="nextBtn">›</button>
+        <select id="fullscreenFolderSelect" class="fullscreen-folder-select" onchange="app.gallery.jumpToFolder(this.value)">
+            <option value="">Jump to Folder...</option>
+        </select>
+        
+        <button class="nav-btn prev-btn" id="prevBtn" onclick="app.fullscreen.navigate(-1)">‹</button>
+        <button class="nav-btn next-btn" id="nextBtn" onclick="app.fullscreen.navigate(1)">›</button>
         
         <div class="fullscreen-content"></div>
         
         <div class="media-info" id="mediaInfo">
             <div class="media-counter"></div>
             <div class="media-filename"></div>
-            <div class="media-filetype"></div>
         </div>
 
         <div class="playback-controls" id="playbackControls">
-            <button id="playPauseBtn">▶ Play</button>
-            <button id="toggleShuffleBtn" onclick="app.utils.toggleSlideshowShuffle()">🔀 Shuffle: OFF</button>
-            <div style="text-align: center;">
-                <input type="number" id="advanceTime" min="500" value="3000" style="width: 60px;"> ms
+            <button id="playPauseBtn" onclick="app.fullscreen.toggleSlideshow()">▶ Play</button>
+            <label style="font-size:12px; color:#ccc;">
+                <input type="checkbox" id="slideshowShuffleCheck" onchange="app.utils.toggleSlideshowShuffle()"> Shuffle
+            </label>
+            <div style="text-align: center; font-size:12px; color:#ccc;">
+                <label>Delay (ms):</label>
+                <input type="number" id="advanceTime" min="500" max="30000" value="3000" step="500" style="width: 70px;">
             </div>
-            <button onclick="app.fullscreen.close()">↩ Back</button>
+            <button onclick="app.fullscreen.close()">↩ Exit</button>
         </div>
 
         <div id="verticalProgress" class="vertical-progress-bar" onclick="app.fullscreen.jumpToProgress(event)">
@@ -117,16 +157,40 @@
         </div>
     </div>
 
+    <!-- Navigation FABs -->
     <div class="nav-fab-container">
-        <div class="nav-fab" onclick="window.scrollTo({top:0, behavior:'smooth'})">⌂</div>
-        <div class="nav-fab" onclick="window.scrollBy({top:800, behavior:'smooth'})">↓</div>
+        <div class="nav-fab" onclick="window.scrollTo({top:0, behavior:'smooth'})" title="Scroll to top">⌂</div>
+        <div class="nav-fab" onclick="window.scrollBy({top:800, behavior:'smooth'})" title="Scroll down">↓</div>
     </div>
 
+    
     <!-- Dependencies -->
     <script src="masonry.pkgd.min.js"></script>
     <script src="imagesloaded.pkgd.min.js"></script>
+    
+    <!-- CDN Fallback (Uncomment if you want internet fallback) -->
+    <!--
+    <script>
+        window.addEventListener('error', function(e) {
+            if (e.target.tagName === 'SCRIPT') {
+                const src = e.target.src;
+                if (src.includes('masonry') && typeof Masonry === 'undefined') {
+                    const cdn = document.createElement('script');
+                    cdn.src = 'https://unpkg.com/masonry-layout@4/dist/masonry.pkgd.min.js';
+                    document.head.appendChild(cdn);
+                }
+                if (src.includes('imagesloaded') && typeof imagesLoaded === 'undefined') {
+                    const cdn = document.createElement('script');
+                    cdn.src = 'https://unpkg.com/imagesloaded@5/imagesloaded.pkgd.min.js';
+                    document.head.appendChild(cdn);
+                }
+            }
+        }, true);
+    </script>
+    -->
+    
 
-    <!-- Application Scripts (Order Matters) -->
+    <!-- Application Scripts (Load Order Critical) -->
     <script src="globals.js"></script>
     <script src="utils.js"></script>
     <script src="media.js"></script>

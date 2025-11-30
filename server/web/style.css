@@ -884,3 +884,13 @@ body {
     text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
     box-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
 }
+
+/* CSS Grid Fallback */
+.masonry-fallback .grid {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)) !important;
+    grid-auto-rows: minmax(100px, auto) !important;
+    gap: 15px !important;
+    align-items: start !important;
+}
+.masonry-fallback .grid-item { width: 100% !important; margin: 0 !important; }
