@@ -157,7 +157,7 @@ jobs:
           - Mouse wheel: Adjust speed
           
           Version: ${{ github.ref_name }}
-          Github Run ${{ $GITHUB_RUN_NUMBER}}
+          Github Run #${{ github.run_number }} (Commit: ${{ github.sha }})
           Built: $(Get-Date -Format "yyyy-MM-dd HH:mm") UTC
           "@ | Out-File -FilePath dist\README.txt -Encoding UTF8
 
