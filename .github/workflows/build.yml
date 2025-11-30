@@ -1,30 +1,25 @@
-name: Build Media Gallery Launcher
+name: Build Media Browser Launcher
 
 on:
-  #push:
+  push:
   workflow_dispatch:
-  
-  
-  
-  #pull_request:
-    #branches: [ main ]
-  
+  #push:
+  #  tags:
+  #    - 'v*'
 
 jobs:
-  build-go-server:
-    name: Build Go Server for ${{ matrix.platform }}
-    runs-on: ${{ matrix.os }}
+  build-server:
+    name: Build Go Server (${{ matrix.platform }})
+    runs-on: windows-latest
     strategy:
       matrix:
         include:
-          - os: windows-latest
-            goos: windows
-            goarch: amd64
+          - goarch: amd64
             platform: windows-amd64
-          - os: windows-latest
-            goos: windows
-            goarch: arm64
+            output: MediaBrowser.exe
+          - goarch: arm64
             platform: windows-arm64
+            output: MediaBrowser-arm64.exe
 
     steps:
       - name: Checkout code
@@ -34,55 +29,38 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.21'
-          cache: true
 
-      - name: Cache Go modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
-      - name: Install dependencies
-        run: |
-          cd server
-          go mod download
-          go mod verify
-
-      - name: Build Go server
+      - name: Build Go server (static)
         env:
           CGO_ENABLED: 0
-          GOOS: ${{ matrix.goos }}
+          GOOS: windows
           GOARCH: ${{ matrix.goarch }}
         run: |
           cd server
-          go build -ldflags="-s -w -X main.Version=${{ github.ref_name }} -X main.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o server.exe .
+          go build -trimpath -ldflags="-s -w -X main.Version=${{ github.ref_name }} -X main.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o server.exe .
           dir
 
-      - name: Upload Go server artifact
+      - name: Upload server artifact
         uses: actions/upload-artifact@v4
         with:
           name: server-${{ matrix.platform }}
           path: server/server.exe
-          retention-days: 1
 
-      - name: Build launcher (x64)
-        shell: bash
-        run: |
-          cd launcher
-          gcc --version
-          gcc -O3 -s -static -mwindows \
-              -o ../MediaBrowser.exe launcher.c resource.res \
-              -lshlwapi -lole32 -lshell32 -lcomdlg32 -ladvapi32 \
-              -Wl,--high-entropy-va,--dynamicbase,--nxcompat \
-              -Wl,--large-address-aware
-          cd ..
-          ls -lh *.exe
-        
-steps:
+  build-launcher:
+    name: Build Launcher (${{ matrix.platform }})
+    runs-on: windows-latest
+    needs: build-server
+    strategy:
+      matrix:
+        include:
+          - goarch: amd64
+            platform: windows-amd64
+            output: MediaBrowser.exe
+          - goarch: arm64
+            platform: windows-arm64
+            output: MediaBrowser-arm64.exe
+
+    steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -92,144 +70,99 @@ steps:
           name: server-${{ matrix.platform }}
           path: server/
 
-      - name: Install MinGW
+      - name: Verify server.exe
         run: |
-          choco install mingw --version=11.2.0 --force -y
-          $env:PATH = "C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin;$env:PATH"
-          gcc --version
-
-      - name: Verify server.exe exists
-        run: |
-          dir server
-          if (!(Test-Path "server\server.exe")) {
-            throw "server.exe not found!"
-          }
+          if (!(Test-Path "server/server.exe")) { exit 1 }
+          Write-Host "server.exe found, size: $((Get-Item server/server.exe).Length / 1MB) MB"
 
       - name: Build resource file
-        shell: cmd
+        shell: bash
         run: |
           cd launcher
           windres resource.rc -O coff -o resource.res
-          if errorlevel 1 exit /b 1
-          dir
+          ls -lh resource.res
 
-      - name: Build C launcher
-        shell: cmd
+      - name: Build C launcher (x64/arm64)
+        shell: bash   # This is the fix — no more cmd.exe "Terminate batch job?"
         run: |
           cd launcher
-          gcc -v
-          gcc -O3 -s -static -mwindows -o ..\${{ matrix.output }} launcher.c resource.res -lshlwapi -lole32
-          if errorlevel 1 exit /b 1
+          echo "Building ${{ matrix.output }}..."
+          gcc -O3 -s -static -mwindows \
+              -o "../${{ matrix.output }}" launcher.c resource.res \
+              -lshlwapi -lole32 -lshell32 -lcomdlg32 -ladvapi32 \
+              -Wl,--high-entropy-va,--dynamicbase,--nxcompat,--large-address-aware
           cd ..
-          dir
+          ls -lh ${{ matrix.output }}
 
-      - name: Verify build
+      - name: Create dist package
         run: |
-          if (!(Test-Path "${{ matrix.output }}")) {
-            throw "Launcher build failed - ${{ matrix.output }} not found!"
-          }
-          $size = (Get-Item "${{ matrix.output }}").Length / 1MB
-          Write-Host "Build successful! Size: $([math]::Round($size, 2)) MB"
-
-      - name: Create portable package
-        run: |
-          New-Item -ItemType Directory -Force -Path dist
+          mkdir dist
           Copy-Item ${{ matrix.output }} dist/
-          
-          @"
-          Media Gallery Launcher
-          ======================
-          This Version is to work with JSONs -- 
-          Usage:
-          1. Copy this executable to any folder containing images/videos
-          2. Double-click to launch
-          3. Browser will open automatically with your gallery
-          
-          Supported formats:
-          - Images: JPG, PNG, WebP, GIF, BMP
-          - Videos: MP4, WebM, OGG, MOV, AVI
-          
-          Keyboard shortcuts in gallery:
-          - Arrow keys / A/D: Navigate
-          - Space: Play/Pause slideshow
-          - Escape: Close fullscreen
-          - Mouse wheel: Adjust speed
-          
-          Version: ${{ github.ref_name }}
-          Github Run #${{ github.run_number }} (Commit: ${{ github.sha }})
-          Built: $(Get-Date -Format "yyyy-MM-dd HH:mm") UTC
-          "@ | Out-File -FilePath dist\README.txt -Encoding UTF8
+          Copy-Item server/server.exe dist/server-embedded.exe  # optional: keep for debugging
 
-      - name: Calculate checksums
+          $readme = @"
+              Media Gallery Launcher
+              ======================
+              
+              Version: ${{ github.ref_name }}
+              Build: #${{ github.run_number }} (${{ github.sha }})
+              Built: $(Get-Date -Format "yyyy-MM-dd HH:mm") UTC
+              
+              Usage:
+              1. Drop this .exe into any folder with photos/videos
+              2. Double-click → gallery opens in browser at https://localhost:8443
+              
+              Features:
+              • Single executable (no install)
+              • HTTPS with auto-cert
+              • Supports JPG, PNG, WebP, GIF, MP4, WebM, MOV, etc.
+              • Slideshow, shuffle, keyboard navigation
+              
+              Note: First run may trigger Windows Defender (false positive). Add exclusion if needed.
+              "@
+                        $readme | Out-File -FilePath dist/README.txt -Encoding UTF8
+
+      - name: Generate SHA256
         run: |
           cd dist
-          $hash = Get-FileHash ${{ matrix.output }} -Algorithm SHA256
-          "$($hash.Hash)  ${{ matrix.output }}" | Out-File -FilePath "${{ matrix.output }}.sha256" -Encoding ASCII
+          Get-FileHash ${{ matrix.output }} -Algorithm SHA256 | 
+            Select-Object -ExpandProperty Hash | 
+            ForEach-Object { "$_  ${{ matrix.output }}" } > "${{ matrix.output }}.sha256"
 
-      - name: Upload artifacts
+      - name: Upload final artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.output }}
           path: dist/*
-          retention-days: 30
-
-   
 
   release:
-    name: Create Release
+    name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: [build-launcher]
+    needs: build-launcher
     if: startsWith(github.ref, 'refs/tags/v')
-    
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
-      - name: Display structure
-        run: |
-          ls -R artifacts/
-
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
-          name: Release ${{ github.ref_name }}
-          body: |
-            ## Media Gallery Launcher ${{ github.ref_name }} (Build ${{ github.run_number }})
-            
-            ### 📥 Downloads
-            - **Windows (x64)**: MediaGallery.exe
-            - **Windows (ARM64)**: MediaGallery-arm64.exe
-            
-            ### ✨ Features
-            - 🚀 Single executable - no installation needed
-            - 🔒 HTTPS server with auto-generated certificates
-            - 🎨 Beautiful masonry gallery layout
-            - ⚡ Custom mouse gestures for navigation
-            - 🎬 Slideshow mode with adjustable speed
-            - 📁 Automatic folder organization
-            - 🔄 Shuffle with viewed tracking
-            
-            ### 🎯 Usage
-            1. Download the executable for your platform
-            2. Drop it into any folder with images/videos
-            3. Double-click to launch
-            4. Gallery opens automatically in your browser at https://localhost:8443
-            5. Accept the security warning (self-signed certificate)
-            
-            ### 🐛 Known Issues
-            - Browser will show security warning (expected - self-signed cert)
-            - Windows Defender might flag first run (false positive)
-            
-            ### 📝 Changelog
-            - Initial release
-            - Full feature set implemented
-          files: |
-            artifacts/**/*.exe
-            artifacts/**/*.txt
-            artifacts/**/*.sha256
+          name: Media Browser Launcher ${{ github.ref_name }}
           draft: false
           prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          files: |
+            artifacts/**/MediaBrowser*.exe
+            artifacts/**/README.txt
+            artifacts/**/*.sha256
+          body: |
+            ## Media Browser Launcher ${{ github.ref_name }}
+
+            Single-file local media gallery viewer.
+
+            ### Downloads
+            - **Windows x64**: `MediaBrowser.exe`
+            - **Windows ARM64**: `MediaBrowser-arm64.exe`
+
+            Just drop into any folder and run!
