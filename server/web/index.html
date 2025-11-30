@@ -21,14 +21,51 @@
 				background-color: #0a0a0a;
 				color: #e0e0e0;
 			}
-  			
+  			/* --- MODE SELECTOR --- */
+			.mode-selector {
+				display: flex;
+				gap: 5px;
+				padding: 8px;
+				background: #1a1a1a;
+				border-bottom: 1px solid #333;
+			}
+
+			.mode-btn {
+				padding: 8px 16px;
+				border: none;
+				border-radius: 6px;
+				cursor: pointer;
+				font-weight: bold;
+				transition: all 0.3s;
+				flex: 1;
+			}
+
+			.mode-btn.active {
+				transform: translateY(-2px);
+				box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+			}
+
+			.mode-sorting { background: #2d5b2d; color: white; }
+			.mode-sorting.active { background: #4CAF50; }
+
+			.mode-comparing { background: #5b4a2d; color: white; }
+			.mode-comparing.active { background: #FF9800; }
+
+			.mode-browsing { background: #2d4a5b; color: white; }
+			.mode-browsing.active { background: #2196F3; }
+
+			/* --- CONTROLS STYLING - MODE SPECIFIC --- */
 			.controls {
-				padding: 15px;
+				padding: 5px 10px;
 				background: linear-gradient(135deg, #1e1e1e 0%, #2d2d2d 100%);
 				border-bottom: 1px solid #3a3a3a;
-				text-align: center;
-				position: sticky;
-				top: 0;
+				max-height: 46px;
+				overflow: hidden;
+				transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s;
+				opacity: 0.95;
+				position: fixed;
+				top: 46px; /* Below mode selector */
+				width: 100%;
 				z-index: 100;
 				backdrop-filter: blur(10px);
 				display: flex;
@@ -36,9 +73,95 @@
 				justify-content: space-between;
 				flex-wrap: wrap;
 				gap: 10px;
-				transition: transform 0.3s ease, opacity 0.3s ease;
+				box-shadow: 0 4px 12px rgba(0,0,0,0.5);
 			}
 
+			.controls:hover {
+				max-height: 400px;
+				opacity: 1;
+				box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+			}
+
+			.controls-group {
+				display: flex;
+				align-items: center;
+				gap: 8px;
+				background: rgba(0,0,0,0.2);
+				padding: 3px 8px;
+				border-radius: 8px;
+				border: 1px solid #3a3a3a;
+			}
+
+			/* Mode-specific control visibility */
+			.sorting-controls { display: flex; }
+			.comparing-controls { display: none; }
+			.browsing-controls { display: none; }
+
+			/* Comparing mode specific styles */
+			.comparing-pair {
+				display: flex;
+				gap: 20px;
+				padding: 20px;
+				justify-content: center;
+				align-items: center;
+				min-height: 80vh;
+			}
+
+			.compare-item {
+				max-width: 45%;
+				border: 3px solid transparent;
+				border-radius: 12px;
+				transition: all 0.3s;
+				cursor: pointer;
+			}
+
+			.compare-item.selected {
+				border-color: #4CAF50;
+				box-shadow: 0 0 30px rgba(76, 175, 80, 0.5);
+			}
+
+			.compare-item img,
+			.compare-item video {
+				width: 100%;
+				height: auto;
+				border-radius: 8px;
+			}
+
+			.compare-info {
+				text-align: center;
+				margin-top: 10px;
+				padding: 10px;
+				background: rgba(0,0,0,0.7);
+				border-radius: 6px;
+			}
+
+			.comparison-stats {
+				text-align: center;
+				padding: 20px;
+				background: #1a1a1a;
+				margin: 20px;
+				border-radius: 12px;
+			}
+
+			/* Browsing mode specific */
+			.browsing-info-panel {
+				position: fixed;
+				right: 20px;
+				top: 100px;
+				width: 300px;
+				background: rgba(0,0,0,0.9);
+				padding: 15px;
+				border-radius: 12px;
+				border-left: 4px solid #2196F3;
+				z-index: 99;
+			}
+
+            /* AI Counters */
+			.ai-counters { display: flex; gap: 10px; font-size: 12px; font-weight: bold; }
+            .shutdown { background-color: #5a1e1e !important; color: white !important; }
+            .shutdown:hover { background-color: #7a2e2e !important; }
+
+	
 			.controls.hidden {
 				transform: translateY(-100%);
 				opacity: 0;
@@ -786,63 +909,99 @@
 <!-- HTML STRUCTURE SECTION -->
 <body>
     <!-- ============ TOP CONTROLS BAR ============ -->
-    <div class="controls" id="topControls">
-        <div class="controls-left">
-            <button onclick="openExplorerAndShowPath()" class="current-folder" id="currentFolder" title="Click to open folder in explorer">
-                <span>📁</span>
-                <span id="folderName" class="current-folder-path">Loading Root Path...</span>
-            </button>
-            <div class="file-counter" id="fileCounter">0 files</div>
-            <div class="nav-controls">
-                <button onclick="navigateBack()" id="navBackBtn" title="Go Back">←</button>
-                <button onclick="navigateUp()" id="navParentBtn" title="Go to Parent Folder">↑</button>
-                <button onclick="navigateForward()" id="navForwardBtn" title="Go Forward">→</button>
+   <div class="mode-selector">
+        <button class="mode-btn mode-sorting active" onclick="setMode('sorting')">
+            🗂️ Sorting Mode
+        </button>
+        <button class="mode-btn mode-comparing" onclick="setMode('comparing')">
+            ⚖️ Comparing Mode
+        </button>
+        <button class="mode-btn mode-browsing" onclick="setMode('browsing')">
+            👀 Browsing Mode
+        </button>
+    </div>
+
+    <div class="controls">
+        <div class="controls-group sorting-controls">
+            <div class="current-folder" id="currentFolder">📁 <span id="folderName">Loading...</span></div>
+            <div class="file-counter" id="fileCounter">0</div>
+            <div class="ai-counters">
+                <span style="color:#4CAF50">✅ <span id="keepCount">0</span></span>
+                <span style="color:#F44336">❌ <span id="discardCount">0</span></span>
             </div>
         </div>
-        
-        <div class="controls-center">
-            <div class="view-mode-toggle">
-                <button class="view-mode-btn active" id="gridViewBtn" onclick="setViewMode('grid')" title="Grid View">▦</button>
-                <button class="view-mode-btn" id="listViewBtn" onclick="setViewMode('list')" title="List View">☰</button>
-            </div>
-            
-            <button onclick="initializeGallery()">🔄 Reload</button>
-            
-            <label>
-                <input type="checkbox" id="quickPreviewToggle" onchange="toggleQuickPreview()"> Quick Preview
-            </label>
-            
-            <label>
-                <input type="checkbox" id="multiSelectToggle" onchange="toggleMultiSelect()"> Multi-Select
-            </label>
-            
-            <button onclick="deleteSelected()" id="deleteBtn" style="display:none;" class="delete-btn">
-                🗑️ Delete (<span id="selectedCount">0</span>)
-            </button>
-            
-            <label for="thumbnailWidth">Size:</label>
-            <input type="range" id="thumbnailWidth" min="150" max="400" value="250" onchange="updateThumbnailSize()">
-            
-            <label for="folderFilter">Folder:</label>
-            <select id="folderFilter" onchange="filterGalleryByFolder()">
-                <option value="all">All Files</option>
+
+        <div class="controls-group sorting-controls">
+            <label>Cols:</label> <input type="range" id="thumbnailWidth" min="150" max="400" value="250" onchange="updateThumbnailSize()">
+            <button onclick="initializeGallery()">🔄</button>
+        </div>
+
+        <div class="controls-group sorting-controls">
+            <label title="Real/CGI minimum">Cont:</label>
+            <input type="number" id="contentThresh" value="0.25" step="0.01" min="0" max="1">
+            <label title="Max negative/trash score">Neg:</label>
+            <input type="number" id="negThresh" value="0.22" step="0.01" min="0" max="1">
+        </div>
+
+        <div class="controls-group comparing-controls">
+            <span style="color:#FF9800; font-weight:bold;">⚖️ Comparing Similar Images</span>
+            <button onclick="loadNewComparisonPair()">🔄 New Pair</button>
+            <button onclick="markBothForKeep()">✅ Keep Both</button>
+            <button onclick="markBothForDiscard()">❌ Discard Both</button>
+        </div>
+
+        <div class="controls-group browsing-controls">
+            <span style="color:#2196F3; font-weight:bold;">👀 Browsing Gallery</span>
+            <button onclick="toggleInfoPanel()">ℹ️ Toggle Info</button>
+            <button onclick="shuffleGallery()">🔀 Shuffle</button>
+        </div>
+
+        <div class="controls-group">
+            <label>Filter:</label>
+            <select id="scoreFilter" onchange="filterGalleryByFolder()">
+                <option value="all">All Items</option>
+                <option value="keep">✅ Keep Only</option>
+                <option value="discard">❌ Discard Only</option>
+                <option value="unscored">⚪ Unscored</option>
             </select>
-            
-            <button onclick="filterFavorites()">⭐ Favorites</button>
-            
-            <label>
-                <input type="checkbox" id="shuffleToggle" onchange="saveSettings()"> Shuffle
-            </label>
-            <button onclick="forceReshuffle()">🔀 Re-shuffle</button>
-            <button onclick="resetViewed()">↺ Reset Viewed</button>
-            <button onclick="quitServer()" class="delete-btn" style="border-color: #d32f2f !important; background-color: rgba(211, 47, 47, 0.2) !important;">❌ Quit</button>
+            <select id="folderFilter" onchange="filterGalleryByFolder()">
+                <option value="all">All Folders</option>
+            </select>
         </div>
-        
-        <div class="controls-right"></div>
+
+        <div class="controls-group">
+            <button onclick="quitServer()" class="shutdown">⏻ Shutdown</button>
+        </div>
     </div>
 	
 	   <!-- ============ MAIN GALLERY CONTENT ============ -->
     <div class="grid"></div>
+
+	<div id="sortingContent" class="content-area">
+        <div class="grid"></div>
+        <div class="scroll-progress" id="scrollProgress">
+            Loaded: <span id="loadedCount">0</span> / <span id="totalCount">0</span>
+        </div>
+    </div>
+
+    <div id="comparingContent" class="content-area" style="display:none;">
+        <div class="comparing-pair" id="comparisonPair">
+            </div>
+        <div class="comparison-stats" id="comparisonStats">
+            Comparisons: <span id="comparisonCount">0</span> | 
+            Decisions: <span id="decisionCount">0</span>
+        </div>
+    </div>
+
+    <div id="browsingContent" class="content-area" style="display:none;">
+        <div class="browsing-info-panel" id="browsingInfoPanel" style="display:none;">
+            <h4>📊 Gallery Info</h4>
+            <div>Total Images: <span id="browseTotalCount">0</span></div>
+            <div>Unique Scenes: <span id="browseSceneCount">0</span></div>
+            <div>Avg. Cluster Size: <span id="browseAvgCluster">0</span></div>
+        </div>
+        <div class="grid" id="browsingGrid"></div>
+    </div>
 
     <!-- ============ UTILITY DISPLAYS ============ -->
     <div id="galleryDir" class="gallery-dir"></div>
@@ -917,33 +1076,260 @@
 	
 <script>
     // ============ GLOBAL VARIABLES ============
-    let allMediaFiles = [];
-    let MEDIA_DATA = {};
-    let FOLDER_MAP = {};
-    let allDirectories = [];
-    let masonry;
-    let loadedMediaCount = 0;
-    const filesPerLoad = 30;
-    let currentMediaIndex = -1;
-    let autoAdvanceInterval = null;
-    let isPlaying = false;
-    let viewedFiles = new Set();
-    let controlsHideTimer = null;
-    let currentRootPath = 'Loading...';
-    let globalVolume = 1.0;
-    let slideshowShuffle = false;
-    let viewMode = 'grid';
-    let multiSelectMode = false;
-    let selectedFiles = new Set();
-    let favoriteFiles = new Set();
-    let quickPreviewEnabled = false;
-    let quickPreviewTimeout = null;
-    let sequentialMode = true;
-    let videoPlayLimit = 5;
-    let animObserver = null;
-    let hoveredMedia = null;
-    let overlayTransitioning = false; 
+// --- GLOBAL VARIABLES ---
+        let currentMode = 'sorting';
+        let allMediaFiles = [];
+        let MEDIA_DATA = {};
+        let SCORE_DATA = {};
+        let FOLDER_MAP = {};
+        let allDirectories = [];
+        let masonry;
+        let loadedMediaCount = 0;
+        const filesPerLoad = 30;
+        let currentMediaIndex = -1;
+        let autoAdvanceInterval = null;
+        let isPlaying = false;
+        let viewedFiles = new Set();
+        let controlsHideTimer = null;
+        let currentRootPath = 'Loading...';
+        let globalVolume = 1.0;
+        let slideshowShuffle = false;
+        let viewMode = 'grid';
+        let multiSelectMode = false;
+        let selectedFiles = new Set();
+        let favoriteFiles = new Set();
+        let quickPreviewEnabled = false;
+        let quickPreviewTimeout = null;
+        let sequentialMode = true;
+        let videoPlayLimit = 5;
+        let animObserver = null;
+        let hoveredMedia = null;
+        let overlayTransitioning = false; 
+        
+        let comparisonPairs = [];
+        let comparisonResults = [];
+        
+        // --- MODE MANAGEMENT ---
+        function setMode(mode) {
+            currentMode = mode;
+            
+            // Update mode buttons
+            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelector(`.mode-${mode}`).classList.add('active');
+            
+            // Show/hide content areas
+            document.querySelectorAll('.content-area').forEach(area => area.style.display = 'none');
+            document.getElementById(`${mode}Content`).style.display = 'block';
+            
+            // Show/hide controls
+            document.querySelectorAll('.controls-group').forEach(group => group.style.display = 'none');
+            document.querySelectorAll(`.${mode}-controls`).forEach(group => group.style.display = 'flex');
+            
+            // Initialize mode-specific features
+            switch(mode) {
+                case 'sorting':
+                    initializeSortingMode();
+                    break;
+                case 'comparing':
+                    initializeComparingMode();
+                    break;
+                case 'browsing':
+                    initializeBrowsingMode();
+                    break;
+            }
+        }
 
+        function initializeSortingMode() {
+            // Your existing sorting functionality
+            if (allMediaFiles.length === 0) {
+                initializeGallery();
+            }
+        }
+
+        function initializeComparingMode() {
+            // Generate comparison pairs from similar images
+            generateComparisonPairs();
+            loadNewComparisonPair();
+        }
+
+        function initializeBrowsingMode() {
+            // Display all images without AI filtering
+            displayBrowsingGallery();
+        }
+
+        // --- COMPARING MODE FUNCTIONS ---
+        function generateComparisonPairs() {
+            comparisonPairs = [];
+            
+            // Group images by similarity (using CLIP cluster data if available)
+            const similarityGroups = {};
+            
+            allMediaFiles.forEach(path => {
+                const media = MEDIA_DATA[path];
+                const scores = SCORE_DATA[media.name]; // Use name as key based on existing structure
+                const clusterId = scores?.cluster_id || 'unknown';
+                
+                if (!similarityGroups[clusterId]) {
+                    similarityGroups[clusterId] = [];
+                }
+                similarityGroups[clusterId].push(path);
+            });
+            
+            // Create pairs from groups with 2+ similar images
+            Object.values(similarityGroups).forEach(group => {
+                if (group.length >= 2) {
+                    // Shuffle and create pairs
+                    const shuffled = [...group].sort(() => Math.random() - 0.5);
+                    for (let i = 0; i < shuffled.length - 1; i += 2) {
+                        comparisonPairs.push([shuffled[i], shuffled[i + 1]]);
+                    }
+                }
+            });
+            
+            console.log(`Generated ${comparisonPairs.length} comparison pairs`);
+        }
+
+        function loadNewComparisonPair() {
+            if (comparisonPairs.length === 0) {
+                document.getElementById('comparisonPair').innerHTML = '<div style="color:#666; text-align:center; padding:50px;">No more comparison pairs available</div>';
+                return;
+            }
+            
+            const pair = comparisonPairs.pop();
+            const [path1, path2] = pair;
+            
+            const html = `
+                <div class="compare-item" onclick="selectForKeep('${path1}')" data-path="${path1}">
+                    ${createMediaElement(path1).outerHTML}
+                    <div class="compare-info">${MEDIA_DATA[path1].name}</div>
+                </div>
+                <div style="color:#666; align-self:center;">VS</div>
+                <div class="compare-item" onclick="selectForKeep('${path2}')" data-path="${path2}">
+                    ${createMediaElement(path2).outerHTML}
+                    <div class="compare-info">${MEDIA_DATA[path2].name}</div>
+                </div>
+            `;
+            
+            document.getElementById('comparisonPair').innerHTML = html;
+            updateComparisonStats();
+        }
+
+        function selectForKeep(selectedPath) {
+            // Mark the selected one as keep, the other as discard
+            const pairContainer = document.getElementById('comparisonPair');
+            const items = pairContainer.querySelectorAll('.compare-item');
+            
+            items.forEach(item => {
+                item.classList.remove('selected');
+                if (item.dataset.path === selectedPath) {
+                    item.classList.add('selected');
+                    // Store decision
+                    comparisonResults.push({
+                        keep: selectedPath,
+                        discard: items.find(i => i.dataset.path !== selectedPath)?.dataset.path,
+                        timestamp: new Date().toISOString()
+                    });
+                }
+            });
+            
+            // Auto-advance after short delay
+            setTimeout(() => {
+                if (comparisonPairs.length > 0) {
+                    loadNewComparisonPair();
+                }
+            }, 1000);
+        }
+
+        function markBothForKeep() {
+            const pairContainer = document.getElementById('comparisonPair');
+            const items = pairContainer.querySelectorAll('.compare-item');
+            const paths = Array.from(items).map(item => item.dataset.path);
+            
+            comparisonResults.push({
+                keep: paths.join(','),
+                discard: null,
+                timestamp: new Date().toISOString()
+            });
+            
+            if (comparisonPairs.length > 0) {
+                loadNewComparisonPair();
+            }
+        }
+
+        function markBothForDiscard() {
+            const pairContainer = document.getElementById('comparisonPair');
+            const items = pairContainer.querySelectorAll('.compare-item');
+            const paths = Array.from(items).map(item => item.dataset.path);
+            
+            comparisonResults.push({
+                keep: null,
+                discard: paths.join(','),
+                timestamp: new Date().toISOString()
+            });
+            
+            if (comparisonPairs.length > 0) {
+                loadNewComparisonPair();
+            }
+        }
+
+        function updateComparisonStats() {
+            document.getElementById('comparisonCount').textContent = comparisonResults.length;
+            document.getElementById('decisionCount').textContent = comparisonPairs.length;
+        }
+
+        // --- BROWSING MODE FUNCTIONS ---
+        function displayBrowsingGallery() {
+            const grid = document.getElementById('browsingGrid');
+            grid.innerHTML = '';
+            
+            // Show all images without AI filtering
+            const elements = allMediaFiles.map(path => {
+                const item = document.createElement('div');
+                item.className = 'grid-item';
+                item.style.width = document.getElementById('thumbnailWidth').value + 'px';
+                item.appendChild(createMediaElement(path));
+                item.onclick = () => openFullscreen(path);
+                return item;
+            });
+            grid.append(...elements);
+            
+            // Initialize Masonry for browsing grid if needed
+            new Masonry(grid, {
+                itemSelector: '.grid-item',
+                columnWidth: parseInt(document.getElementById('thumbnailWidth').value),
+                gutter: 15,
+                fitWidth: true
+            });
+            
+            // Calculate browsing stats
+            updateBrowsingStats();
+        }
+
+        function updateBrowsingStats() {
+            const clusterSizes = {};
+            Object.values(SCORE_DATA).forEach(score => {
+                const clusterId = score.cluster_id || 'unknown';
+                clusterSizes[clusterId] = (clusterSizes[clusterId] || 0) + 1;
+            });
+            
+            const uniqueScenes = Object.keys(clusterSizes).length;
+            const avgClusterSize = uniqueScenes > 0 ? (allMediaFiles.length / uniqueScenes) : 0;
+            
+            document.getElementById('browseTotalCount').textContent = allMediaFiles.length;
+            document.getElementById('browseSceneCount').textContent = uniqueScenes;
+            document.getElementById('browseAvgCluster').textContent = avgClusterSize.toFixed(1);
+        }
+
+        function toggleInfoPanel() {
+            const panel = document.getElementById('browsingInfoPanel');
+            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function shuffleGallery() {
+            // Shuffle and re-render browsing gallery
+            allMediaFiles = [...allMediaFiles].sort(() => Math.random() - 0.5);
+            displayBrowsingGallery();
+        }
 
     // Navigation History Variables
     let navigationHistory = [];
