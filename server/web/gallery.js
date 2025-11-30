@@ -1,6 +1,3 @@
-*Navigation, Filtering, and History.*
-
-```javascript
 app.gallery = {
     // Primary Filter Logic
     filterByFolder(recordHistory = true) {
@@ -8,7 +5,6 @@ app.gallery = {
         const folder = document.getElementById('folderFilter').value;
         const grid = document.querySelector('.grid');
         
-        // UI Updates
         document.getElementById('galleryDir').textContent = folder === 'all' ? 'Root' : folder;
         if (s.masonry) { s.masonry.destroy(); s.masonry = null; }
         grid.innerHTML = '';
@@ -21,6 +17,7 @@ app.gallery = {
                 s.historyIndex++;
             }
         }
+        this.updateNavButtons();
 
         // Render Subfolders
         this.renderSubfolders(folder);
@@ -30,7 +27,10 @@ app.gallery = {
             ? [...s.FOLDER_MAP['all']] 
             : s.FOLDER_MAP['all'].filter(f => f.startsWith(folder + '/'));
 
-        s.allMediaFiles = displayList; // Update current context
+        // Apply Shuffle if active (optional restoration of feature)
+        // if (s.isShuffled) app.utils.shuffleArray(displayList);
+
+        s.allMediaFiles = displayList;
         s.loadedMediaCount = 0;
         
         app.media.appendBatch(s.allMediaFiles.slice(0, s.filesPerLoad));
@@ -72,11 +72,43 @@ app.gallery = {
 
     loadMore() {
         const s = app.state;
-        if (s.loadedMediaCount >= s.allMediaFiles.length) return;
+        if (s.loadedMediaCount >= s.allMediaFiles.length) {
+            // End of files reached? Check if we should show Next Folder Card
+            const current = document.getElementById('folderFilter').value;
+            if (current !== 'all' && !document.querySelector('.next-folder-card')) {
+                app.media.appendNextFolderCard(current);
+            }
+            return;
+        }
         
         const nextBatch = s.allMediaFiles.slice(s.loadedMediaCount, s.loadedMediaCount + s.filesPerLoad);
         app.media.appendBatch(nextBatch);
         s.loadedMediaCount += nextBatch.length;
+    },
+
+    // History Navigation
+    navigateHistory(direction) {
+        const s = app.state;
+        if (direction === -1 && s.historyIndex > 0) {
+            s.historyIndex--;
+        } else if (direction === 1 && s.historyIndex < s.navigationHistory.length - 1) {
+            s.historyIndex++;
+        } else {
+            return;
+        }
+        
+        const folder = s.navigationHistory[s.historyIndex];
+        document.getElementById('folderFilter').value = folder;
+        this.filterByFolder(false); // Don't record this step
+    },
+
+    updateNavButtons() {
+        const s = app.state;
+        const backBtn = document.getElementById('navBackBtn');
+        const fwdBtn = document.getElementById('navForwardBtn');
+        
+        if (backBtn) backBtn.disabled = s.historyIndex <= 0;
+        if (fwdBtn) fwdBtn.disabled = s.historyIndex >= s.navigationHistory.length - 1;
     },
     
     populateDropdowns() {
@@ -102,7 +134,6 @@ app.gallery = {
 
     shuffle() {
         app.utils.shuffleArray(app.state.allMediaFiles);
-        // Reset grid
         const grid = document.querySelector('.grid');
         if (app.state.masonry) { app.state.masonry.destroy(); app.state.masonry = null; }
         grid.innerHTML = '';
