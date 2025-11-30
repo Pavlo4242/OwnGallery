@@ -76,7 +76,7 @@ app.media = {
             const infoDiv = document.createElement('div');
             infoDiv.className = isListView ? 'list-item-info' : 'item-info';
             infoDiv.innerHTML = `<div class="item-name">${info.name}</div>`;
-            if(isListView) infoDiv.innerHTML += `<div class="list-item-meta">${info.isVideo ? 'Video' : 'Image'}</div>`;
+            if(isListView) infoDiv.innerHTML += `<div class="list-item-meta">${app.utils.getFileExtension(info.name)} • ${info.isVideo ? 'Video' : 'Image'}</div>`;
             item.appendChild(infoDiv);
 
             // 5. Interaction
@@ -93,7 +93,11 @@ app.media = {
 
             // 6. Hover Events
             if (!isListView) {
-                item.onmouseenter = () => { app.state.hoveredMedia = item; app.media.managePlayback(); app.utils.showQuickPreview(fileName); };
+                item.onmouseenter = () => { 
+                app.state.hoveredMedia = item; 
+                app.media.managePlayback(); 
+                if (app.state.quickPreviewEnabled) app.utils.showQuickPreview(fileName);
+            };
                 item.onmouseleave = () => { app.state.hoveredMedia = null; app.media.managePlayback(); app.utils.hideQuickPreview(); };
             }
 
