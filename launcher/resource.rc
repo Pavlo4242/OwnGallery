@@ -25,7 +25,7 @@ BEGIN
             VALUE "FileVersion", "2.0.0.0"
             VALUE "InternalName", "MediaBrowser"
             VALUE "LegalCopyright", "Open Source MIT License"
-            VALUE "OriginalFilename", "MediaBrowser.exe"
+            VALUE "OriginalFilename", "MediaBrowser.bin"
             VALUE "ProductName", "Media Browser Launcher"
             VALUE "ProductVersion", "2.0.0.0"
         END
