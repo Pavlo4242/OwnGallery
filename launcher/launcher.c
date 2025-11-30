@@ -141,7 +141,7 @@ void CleanupWithRetries(const char* serverPath, const char* tempPath) {
 
 BOOL StartServer(const char* mediaDir, const char* port) {
     if (hServerProcess) {
-        TerminateServerProcess(hServerProcess, serverProcessInfo.dwProcessId);
+        TerminateServerProcess(hServerProcess, serverProcessInfo.dwProcessInfo.dwProcessId);
         CloseHandle(hServerProcess);
         CloseHandle(serverProcessInfo.hThread);
         hServerProcess = NULL;
@@ -150,31 +150,20 @@ BOOL StartServer(const char* mediaDir, const char* port) {
     STARTUPINFO si = { sizeof(si) };
     PROCESS_INFORMATION pi = { 0 };
 
-    // PRODUCTION: hidden console
-    // DEBUG: uncomment the two lines below to see server output
-    // DEBUG ONLY — FORCE CONSOLE WINDOW
+    // FOR DEBUG: Remove this block in final release
     DWORD creationFlags = CREATE_NEW_CONSOLE | CREATE_NEW_PROCESS_GROUP;
     si.dwFlags = STARTF_USESHOWWINDOW;
     si.wShowWindow = SW_SHOW;
 
-    
-     //DWORD creationFlags = CREATE_NEW_CONSOLE;           // ← DEBUG: shows console
-    // si.wShowWindow = SW_SHOW;                           // ← DEBUG: visible window
-
-   // DWORD creationFlags = showConsole ? 0 : CREATE_NO_WINDOW;
-    // creationFlags |= CREATE_NEW_PROCESS_GROUP;  // For Ctrl+C
-
-    if (showConsole) {
-        si.dwFlags = 0;
-        si.wShowWindow = SW_SHOW;
-    } else {
-        si.dwFlags = STARTF_USESHOWWINDOW;
-        si.wShowWindow = SW_HIDE;
-    }
+    // FOR PRODUCTION (uncomment this, comment out above):
+    // DWORD creationFlags = CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP;
+    // si.dwFlags = STARTF_USESHOWWINDOW;
+    // si.wShowWindow = SW_HIDE;
 
     char cmdLine[BUFFER_SIZE];
-    snprintf(cmdLine, sizeof(cmdLine), "cmd /c \"%s\" \"%s\" %s nobrowser", 
-         serverExePath, mediaDir, port);
+    // CORRECT: Run .bin directly — Windows allows it!
+    snprintf(cmdLine, sizeof(cmdLine), "\"%s\" \"%s\" %s nobrowser",
+             serverExePath, mediaDir, port);
 
     BOOL ok = CreateProcessA(
         NULL, cmdLine, NULL, NULL, FALSE,
@@ -184,12 +173,12 @@ BOOL StartServer(const char* mediaDir, const char* port) {
     if (!ok) {
         char msg[1024];
         snprintf(msg, sizeof(msg),
-            "Failed to start server.exe\n"
+            "Failed to start server\n"
             "Path: %s\n"
-            "Error: %lu\n\n"
-            "This is usually caused by antivirus blocking the file write.",
+            "Error: %lu\n"
+            "Try disabling antivirus temporarily.", 
             serverExePath, GetLastError());
-        MessageBoxA(NULL, msg, "Server Start Failed", MB_ICONERROR);
+        MessageBoxA(NULL, msg, "Start Failed", MB_ICONERROR);
         return FALSE;
     }
 
@@ -202,6 +191,8 @@ BOOL StartServer(const char* mediaDir, const char* port) {
 
     return TRUE;
 }
+
+
 void ShowHelp() {
     const char* helpText = 
         "\n"
