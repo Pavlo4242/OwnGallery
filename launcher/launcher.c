@@ -51,23 +51,21 @@ BOOL ExtractServerBinary(char* outputPath) {
     void* data = LockResource(hResData);
     if (!data) return FALSE;
 
+    // Delete any existing file with retries
     for (int i = 0; i < MAX_RETRIES; i++) {
         if (!PathFileExists(outputPath)) break;
+        SetFileAttributes(outputPath, FILE_ATTRIBUTE_NORMAL);
         DeleteFile(outputPath);
-        if (!PathFileExists(outputPath)) break;
         Sleep(RETRY_DELAY);
     }
 
-    char uniquePath[MAX_PATH];
-    if (PathFileExists(outputPath)) {
-        snprintf(uniquePath, sizeof(uniquePath), "%s.%d.exe", outputPath, (int)time(NULL));
-        strcpy(outputPath, uniquePath);
-    }
+    // No fallback to ".123456.exe" — we already chose a unique name!
+    // Just write directly
 
-    HANDLE hFile = CreateFile(outputPath, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 
+    HANDLE hFile = CreateFile(outputPath, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
                               FILE_ATTRIBUTE_NORMAL, NULL);
     if (hFile == INVALID_HANDLE_VALUE) return FALSE;
-    
+   
     DWORD written;
     BOOL result = WriteFile(hFile, data, size, &written, NULL);
     CloseHandle(hFile);
@@ -83,52 +81,62 @@ void GetCurrentDir(char* buffer, size_t size) {
 }
 
 void LaunchBrowser(const char* url) {
-    Sleep(2000);
-    char cmd[BUFFER_SIZE];
-    snprintf(cmd, sizeof(cmd), 
-        "\"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe\" --ignore-certificate-errors \"%s\"", url);
-    
-    STARTUPINFO si = {sizeof(si)};
-    PROCESS_INFORMATION pi;
-    
-    if (!CreateProcess(NULL, cmd, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
-        snprintf(cmd, sizeof(cmd), 
-            "\"C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe\" --ignore-certificate-errors \"%s\"", url);
-        
-        if (!CreateProcess(NULL, cmd, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
-            ShellExecute(NULL, "open", url, NULL, NULL, SW_SHOWNORMAL);
-            return;
-        }
+    Sleep(2800);  // Give server time to bind HTTPS
+
+    // This is the ONLY reliable way on Windows
+    HINSTANCE result = ShellExecuteA(NULL, "open", url, NULL, NULL, SW_SHOWNORMAL);
+
+    // ShellExecute returns >32 on success, <=32 on error
+    if ((intptr_t)result <= 32) {
+        MessageBoxA(NULL,
+            "Could not open your default browser automatically.\n\n"
+            "Please open this URL manually:\n"
+            "https://localhost:8987",
+            "Media Browser", MB_ICONINFORMATION | MB_OK);
     }
-    CloseHandle(pi.hProcess);
-    CloseHandle(pi.hThread);
 }
 
 void TerminateServerProcess(HANDLE hProcess, DWORD processId) {
-    if (hProcess && hProcess != INVALID_HANDLE_VALUE) {
-        DWORD exitCode;
-        if (GetExitCodeProcess(hProcess, &exitCode) && exitCode == STILL_ACTIVE) {
-            GenerateConsoleCtrlEvent(CTRL_C_EVENT, processId);
-            if (WaitForSingleObject(hProcess, 3000) == WAIT_TIMEOUT) {
-                TerminateProcess(hProcess, 0);
-                WaitForSingleObject(hProcess, 1000);
-            }
+    if (!hProcess || hProcess == INVALID_HANDLE_VALUE)
+        return;
+
+    DWORD exitCode;
+    if (GetExitCodeProcess(hProcess, &exitCode) && exitCode == STILL_ACTIVE) {
+        // Graceful: send Ctrl+C to the entire process group
+        GenerateConsoleCtrlEvent(CTRL_C_EVENT, 0);
+
+        // Wait up to 5 seconds for clean shutdown
+        if (WaitForSingleObject(hProcess, 5000) == WAIT_TIMEOUT) {
+            // Force kill if it didn't exit
+            TerminateProcess(hProcess, 1);
         }
     }
+
+    // Final cleanup
+    WaitForSingleObject(hProcess, INFINITE);
+    CloseHandle(hProcess);
 }
 
 void CleanupWithRetries(const char* serverPath, const char* tempPath) {
+    // Delete server exe
     for (int i = 0; i < MAX_RETRIES; i++) {
         if (!PathFileExists(serverPath)) break;
         SetFileAttributes(serverPath, FILE_ATTRIBUTE_NORMAL);
         if (DeleteFile(serverPath)) break;
         Sleep(RETRY_DELAY);
     }
-    for (int i = 0; i < MAX_RETRIES; i++) {
-        if (!PathFileExists(tempPath)) break;
-        if (RemoveDirectory(tempPath)) break;
-        Sleep(RETRY_DELAY);
-    }
+
+    // Delete entire temp folder recursively
+    char doubleNullPath[MAX_PATH + 2] = {0};
+    strcpy(doubleNullPath, tempPath);
+    int len = strlen(doubleNullPath);
+    if (len > 0 && doubleNullPath[len-1] == '\\') doubleNullPath[len-1] = 0; // remove trailing \
+
+    SHFILEOPSTRUCT shOp = {0};
+    shOp.wFunc = FO_DELETE;
+    shOp.pFrom = doubleNullPath;
+    shOp.fFlags = FOF_SILENT | FOF_NOERRORUI | FOF_NOCONFIRMATION;
+    SHFileOperation(&shOp);
 }
 
 BOOL StartServer(const char* mediaDir, const char* port) {
@@ -141,21 +149,19 @@ BOOL StartServer(const char* mediaDir, const char* port) {
 
     STARTUPINFO si = {sizeof(si)};
     PROCESS_INFORMATION pi;
-    DWORD creationFlags; // We will set this based on our flag
-
-    // --- Conditional logic for showing/hiding the console ---
+    DWORD creationFlags = showConsole ? 0 : CREATE_NO_WINDOW;
     if (showConsole) {
-        // To SHOW the console, we use the default system settings.
-        // A console application will create a console by default.
-        creationFlags = 0; // No special creation flags
         si.dwFlags = 0;
         si.wShowWindow = SW_SHOW;
     } else {
-        // To HIDE the console, we use the original logic.
-        creationFlags = CREATE_NO_WINDOW;
         si.dwFlags = STARTF_USESHOWWINDOW;
         si.wShowWindow = SW_HIDE;
     }
+
+    // Critical: Allow graceful shutdown via CTRL+C
+    creationFlags |= CREATE_NEW_PROCESS_GROUP;
+
+    
     // --- End of conditional logic ---
     
     char cmdLine[BUFFER_SIZE];
@@ -404,7 +410,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                         }
                     }
                     if (isNumeric) {
-                        strncpy(currentPort, arg, sizeof(currentPort) - 1);
+                        snprintf(currentPort, sizeof(currentPort), "%s", arg);
                     }
                 }
             }
@@ -432,19 +438,32 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         GetCurrentDir(currentDir, sizeof(currentDir));
     }
     
+// === FIXED: Secure, unique temp directory + exe name ===
     GetTempPath(sizeof(tempExePath), tempExePath);
-    snprintf(tempExePath + strlen(tempExePath), sizeof(tempExePath) - strlen(tempExePath), 
-             "MediaBrowser_%d\\", GetCurrentProcessId());
-    CreateDirectory(tempExePath, NULL);
     
-    snprintf(serverExePath, sizeof(serverExePath), "%sserver.exe", tempExePath);
+    // Use GUID + tick count for true uniqueness (no PID reuse issues)
+    UUID uuid;
+    UuidCreate(&uuid);
+    char uuidStr[64];
+    snprintf(uuidStr, sizeof(uuidStr), "MediaBrowser_%08x%04x%04x",
+             GetTickCount(), uuid.Data4[0] << 8 | uuid.Data4[1], uuid.Data4[2] << 8 | uuid.Data4[3]);
+
+    strcat(tempExePath, uuidStr);
+    strcat(tempExePath, "\\");
+    CreateDirectory(tempExePath, NULL);
+
+    // Always use a fully unique server exe name
+    snprintf(serverExePath, sizeof(serverExePath), "%sserver_%08x%04x.exe", 
+             tempExePath, GetTickCount(), uuid.Data4[0] << 8 | uuid.Data4[1]);
+
     if (!ExtractServerBinary(serverExePath)) {
-         char errMsg[512];
-         snprintf(errMsg, sizeof(errMsg), 
-                  "Failed to extract server binary to:\n%s\n\nError code: %lu\n\n"
-                  "Try running as Administrator or check antivirus settings.",
-                  serverExePath, GetLastError());
-         MessageBox(NULL, errMsg, "Extraction Error", MB_ICONERROR | MB_OK);
+        char errMsg[512];
+        snprintf(errMsg, sizeof(errMsg),
+                 "Failed to extract server binary to:\n%s\n\nError code: %lu\n\n"
+                 "Try running as Administrator or check antivirus settings.",
+                 serverExePath, GetLastError());
+        MessageBox(NULL, errMsg, "Extraction Error", MB_ICONERROR | MB_OK);
+        CleanupWithRetries(serverExePath, tempExePath);
         return 1;
     }
 
