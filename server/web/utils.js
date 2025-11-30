@@ -18,6 +18,36 @@ app.utils = {
         fetch('/api/quit', { method: 'POST' }).then(() => document.body.innerHTML = '<h1>Server Stopped</h1>');
     },
 
+    getFileExtension(fileName) {
+    const parts = fileName.split('.');
+    return parts.length > 1 ? parts[parts.length - 1].toUpperCase() : 'FILE';
+},
+
+// --- Update toggleQuickPreview logic in utils.js to manage DOM ---
+toggleQuickPreview: (isChecked) => {
+    app.state.quickPreviewEnabled = isChecked;
+    app.utils.saveSettings();
+    if (!isChecked) app.utils.hideQuickPreview();
+},
+
+// --- Add Favorites Filtering (from DELui.js) ---
+filterFavorites: () => {
+    const s = app.state;
+    document.getElementById('folderFilter').value = 'all'; 
+    
+    // Filter the full map down to only files that are in the favorites Set
+    s.allMediaFiles = Array.from(s.favoriteFiles).filter(f => s.MEDIA_DATA[f]);
+    s.loadedMediaCount = 0;
+    
+    // Reset Grid
+    const grid = document.querySelector('.grid');
+    if (s.masonry) { s.masonry.destroy(); s.masonry = null; }
+    grid.innerHTML = '';
+    
+    app.gallery.updateCounter();
+    app.gallery.loadMore();
+}
+
     // --- Selection & Deletion ---
     toggleMultiSelect() {
         app.state.multiSelectMode = !app.state.multiSelectMode;
