@@ -47,7 +47,7 @@ type FileInfo struct {
 }
 
 func main() {
-	log.Printf("Media Gallery Server %s (built %s)", Version, BuildTime)
+	log.Printf("Media Browser Server %s (built %s)", Version, BuildTime)
 	log.Printf("Server started with arguments: %v", os.Args) 
     
 	mediaDir, err := os.Getwd()
@@ -202,8 +202,7 @@ func setupRoutes(mediaDir string) {
 	// API endpoint for file list (with details)
 	http.HandleFunc("/api/files", func(w http.ResponseWriter, r *http.Request) {
 		updateActivity()
-		source := r.URL.Query().Get("source") // Get requested source
-		files, directories, err := getDetailedFileListAndFolders(mediaDir, source)
+		files, directories, err := getDetailedFileListAndFolders(mediaDir)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -217,21 +216,8 @@ func setupRoutes(mediaDir string) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(response)
 	})
-
-	// API to list available data sources (JSON files)
-	http.HandleFunc("/api/sources", func(w http.ResponseWriter, r *http.Request) {
-		updateActivity()
-		matches, _ := filepath.Glob(filepath.Join(mediaDir, "*.json"))
-		var sources []string
-		for _, m := range matches {
-			sources = append(sources, filepath.Base(m))
-		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(sources)
-	})
 	
-	
-		http.HandleFunc("/api/root_dir", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/api/root_dir", func(w http.ResponseWriter, r *http.Request) {
 		updateActivity()
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{
@@ -257,20 +243,6 @@ func setupRoutes(mediaDir string) {
 			"version": Version,
 		})
 	})
-
-	// API to list available data sources (JSON files)
-http.HandleFunc("/api/sources", func(w http.ResponseWriter, r *http.Request) {
-	updateActivity()
-	matches, _ := filepath.Glob(filepath.Join(mediaDir, "*.json"))
-	var sources []string
-	for _, m := range matches {
-		sources = append(sources, filepath.Base(m))
-	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(sources)
-})
-
-	
 http.HandleFunc("/api/quit", func(w http.ResponseWriter, r *http.Request) {
         if r.Method != "POST" {
             http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -284,177 +256,56 @@ http.HandleFunc("/api/quit", func(w http.ResponseWriter, r *http.Request) {
     })
 }
 
-func getDetailedFileListAndFolders(dir, source string) ([]FileInfo, []string, error) {
-    // 1. Automatic Priority: If no source specified, check for priority manifests
-    if source == "" {
-        // List of files to look for in order of priority
-        priorityFiles := []string{"image_scores.json", "representative_gallery.json", "clustering_output.json", "gallery.json"}
-        for _, fName := range priorityFiles {
-            if _, err := os.Stat(filepath.Join(dir, fName)); err == nil {
-                log.Printf("✨ Auto-detected manifest: %s", fName)
-                source = fName
-                break
-            }
-        }
-    }
-
-	// 2. If a specific JSON source is requested (and not "disk"), try to load it
-	if source != "" && source != "disk" {
-		manifestPath := filepath.Join(dir, source)
-		if _, err := os.Stat(manifestPath); err == nil {
-			log.Printf("📄 Loading manifest: %s", source)
-			return loadFromManifest(dir, manifestPath)
-		}
-	}
-
-	// 3. Fallback/Default: Walk directory (Disk Scan)
-	log.Println("📂 Scanning directory structure...")
-	extensions := map[string]bool{
-		".jpg": false, ".jpeg": false, ".png": false, ".webp": false,
-		".gif": false, ".mp4": true, ".webm": true, ".ogg": true,
-		".bmp": false, ".svg": false, ".mov": true, ".avi": true,
-	}
-
-	var files []FileInfo
-	var directories []string // New list for directories
-	
-	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		// If there is an error accessing the path (e.g. permission denied), skip it
-		if err != nil {
-			log.Printf("⚠️ Error accessing path %q: %v", path, err)
-			if info != nil && info.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-
-		if strings.HasPrefix(info.Name(), ".") { // Skip hidden files/folders
-			return nil // Skip hidden files
-		}
-
-		// If it's a directory, add its relative path to the list
-		if info.IsDir() {
-			// Don't add the root directory itself, only subdirectories
-			if path != dir {
-				relPath, _ := filepath.Rel(dir, path)
-				directories = append(directories, filepath.ToSlash(relPath))
-			}
-			return nil // Continue walking
-		}
-
-		// Existing logic for processing files
-		ext := strings.ToLower(filepath.Ext(path))
-		if isVideo, exists := extensions[ext]; exists {
-			relPath, _ := filepath.Rel(dir, path)
-			files = append(files, FileInfo{
-				Path:     filepath.ToSlash(relPath),
-				Name:     info.Name(),
-				Size:     info.Size(),
-				Modified: info.ModTime().Format(time.RFC3339),
-				IsVideo:  isVideo,
-			})
-		}
-		return nil
-	})
-
-	return files, directories, err
-}
-
-// loadFromManifest reads a pre-generated JSON manifest and handles multiple formats
-func loadFromManifest(baseDir, manifestPath string) ([]FileInfo, []string, error) {
-	data, err := os.ReadFile(manifestPath)
-	if err != nil {
-		return nil, nil, err
-	}
-
-    // Flexible structure to handle "files" (standard) or "gallery" (clustering output) keys
-	var rawData struct {
-		Files []struct {
-			Path     string `json:"path"`
-			Name     string `json:"name"`
-            Filename string `json:"filename"` // Handle 'filename' vs 'name'
-		} `json:"files"`
-        Gallery []struct {
-			Path     string `json:"path"`
-            Filename string `json:"filename"`
-		} `json:"gallery"`
-        Directories []string `json:"directories"`
-	}
-
-	if err := json.Unmarshal(data, &rawData); err != nil {
-		return nil, nil, err
-	}
-
-    // Standardize the list
-    var fileList []FileInfo
-    var dirList []string = rawData.Directories
-    
-    // Use 'gallery' if 'files' is empty
-    type rawItem struct { Path, Name, Filename string }
-    var sourceList []rawItem
-    
-    if len(rawData.Gallery) > 0 {
-        for _, item := range rawData.Gallery {
-            sourceList = append(sourceList, rawItem{Path: item.Path, Filename: item.Filename})
-        }
-    } else {
-        for _, item := range rawData.Files {
-            sourceList = append(sourceList, rawItem{Path: item.Path, Name: item.Name, Filename: item.Filename})
-        }
-    }
-
-    // Convert to FileInfo
+func getDetailedFileListAndFolders(dir string) ([]FileInfo, []string, error) {
     extensions := map[string]bool{
-        ".mp4": true, ".webm": true, ".ogg": true, ".mov": true, ".avi": true,
+        ".jpg": false, ".jpeg": false, ".png": false, ".webp": false,
+        ".gif": false, ".mp4": true, ".webm": true, ".ogg": true,
+        ".bmp": false, ".svg": false, ".mov": true, ".avi": true,
     }
 
-    seenDirs := make(map[string]bool)
-    if len(dirList) > 0 {
-        for _, d := range dirList { seenDirs[filepath.ToSlash(d)] = true }
-    }
-
-	for _, item := range sourceList {
-        // Fix path: remove absolute prefix if present (common in Python scripts)
-        relPath := item.Path
-        // Basic check if path contains baseDir, strip it
-        if strings.Contains(relPath, baseDir) {
-            relPath, _ = filepath.Rel(baseDir, relPath)
-        }
-		relPath = filepath.ToSlash(relPath)
-        
-        // Handle name
-        name := item.Name
-        if name == "" { name = item.Filename }
-        if name == "" { name = filepath.Base(relPath) }
-
-        // Check if file actually exists to get size/modtime
-        fullPath := filepath.Join(baseDir, relPath)
-        info, err := os.Stat(fullPath)
-        if err != nil { continue } // Skip missing files
-
-        ext := strings.ToLower(filepath.Ext(name))
-        isVideo := extensions[ext]
-
-		fileList = append(fileList, FileInfo{
-            Path: relPath,
-            Name: name,
-            Size: info.Size(),
-            Modified: info.ModTime().Format(time.RFC3339),
-            IsVideo: isVideo,
-        })
-
-        // Auto-generate directories if missing
-        if len(dirList) == 0 {
-            d := filepath.Dir(relPath)
-            d = filepath.ToSlash(d)
-            if d != "." && d != "" && !seenDirs[d] {
-                seenDirs[d] = true
-                dirList = append(dirList, d)
-            }
-        }
-	}
+    var files []FileInfo
+    var directories []string // New list for directories
     
-	return fileList, dirList, nil
+    err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+        // If there is an error accessing the path (e.g. permission denied), skip it
+        if err != nil {
+            log.Printf("⚠️ Error accessing path %q: %v", path, err)
+            if info != nil && info.IsDir() {
+                return filepath.SkipDir
+            }
+            return nil
+        }
+
+        if strings.HasPrefix(info.Name(), ".") { // Skip hidden files/folders
+            return nil // Skip hidden files
+        }
+
+        // If it's a directory, add its relative path to the list
+        if info.IsDir() {
+            // Don't add the root directory itself, only subdirectories
+            if path != dir {
+                relPath, _ := filepath.Rel(dir, path)
+                directories = append(directories, filepath.ToSlash(relPath))
+            }
+            return nil // Continue walking
+        }
+
+        // Existing logic for processing files
+        ext := strings.ToLower(filepath.Ext(path))
+        if isVideo, exists := extensions[ext]; exists {
+            relPath, _ := filepath.Rel(dir, path)
+            files = append(files, FileInfo{
+                Path:     filepath.ToSlash(relPath),
+                Name:     info.Name(),
+                Size:     info.Size(),
+                Modified: info.ModTime().Format(time.RFC3339),
+                IsVideo:  isVideo,
+            })
+        }
+        return nil
+    })
+
+    return files, directories, err
 }
 
 func generateOrLoadCertificate() (tls.Certificate, error) {
@@ -487,7 +338,7 @@ func generateOrLoadCertificate() (tls.Certificate, error) {
 	template := x509.Certificate{
 		SerialNumber: serialNumber,
 		Subject: pkix.Name{
-			Organization: []string{"Media Gallery Local Server"},
+			Organization: []string{"Media Browser Local Server"},
 			CommonName:   "localhost",
 		},
 		NotBefore:             time.Now(),
