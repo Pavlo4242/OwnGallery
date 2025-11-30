@@ -148,14 +148,14 @@ BOOL StartServer(const char* mediaDir, const char* port) {
     PROCESS_INFORMATION pi = { 0 };
 
     // FOR DEBUG: Remove this block in final release
-    DWORD creationFlags = CREATE_NEW_CONSOLE | CREATE_NEW_PROCESS_GROUP;
-    si.dwFlags = STARTF_USESHOWWINDOW;
-    si.wShowWindow = SW_SHOW;
+  //  DWORD creationFlags = CREATE_NEW_CONSOLE | CREATE_NEW_PROCESS_GROUP;
+ //   si.dwFlags = STARTF_USESHOWWINDOW;
+ //   si.wShowWindow = SW_SHOW;
 
     // FOR PRODUCTION (uncomment this, comment out above):
-    // DWORD creationFlags = CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP;
-    // si.dwFlags = STARTF_USESHOWWINDOW;
-    // si.wShowWindow = SW_HIDE;
+     DWORD creationFlags = CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP;
+     si.dwFlags = STARTF_USESHOWWINDOW;
+     si.wShowWindow = SW_HIDE;
 
     char cmdLine[BUFFER_SIZE];
     // CORRECT: Run .bin directly — Windows allows it!
