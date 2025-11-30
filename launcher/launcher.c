@@ -618,7 +618,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     CloseHandle(hServerProcess);
     CloseHandle(serverProcessInfo.hThread);
     Sleep(1000);
- //   CleanupWithRetries(serverExePath, tempExePath);
+    CleanupWithRetries(serverExePath, tempExePath);
     
     CoUninitialize();
     return 0;
