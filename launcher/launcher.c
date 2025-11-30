@@ -152,11 +152,17 @@ BOOL StartServer(const char* mediaDir, const char* port) {
 
     // PRODUCTION: hidden console
     // DEBUG: uncomment the two lines below to see server output
-     DWORD creationFlags = CREATE_NEW_CONSOLE;           // ← DEBUG: shows console
-     si.wShowWindow = SW_SHOW;                           // ← DEBUG: visible window
+    // DEBUG ONLY — FORCE CONSOLE WINDOW
+    DWORD creationFlags = CREATE_NEW_CONSOLE | CREATE_NEW_PROCESS_GROUP;
+    si.dwFlags = STARTF_USESHOWWINDOW;
+    si.wShowWindow = SW_SHOW;
 
-    DWORD creationFlags = showConsole ? 0 : CREATE_NO_WINDOW;
-    creationFlags |= CREATE_NEW_PROCESS_GROUP;  // For Ctrl+C
+    
+     //DWORD creationFlags = CREATE_NEW_CONSOLE;           // ← DEBUG: shows console
+    // si.wShowWindow = SW_SHOW;                           // ← DEBUG: visible window
+
+   // DWORD creationFlags = showConsole ? 0 : CREATE_NO_WINDOW;
+    // creationFlags |= CREATE_NEW_PROCESS_GROUP;  // For Ctrl+C
 
     if (showConsole) {
         si.dwFlags = 0;
