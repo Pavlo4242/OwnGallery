@@ -1,6 +1,4 @@
 *API calls, LocalStorage, and helper functions.*
-
-```javascript
 app.utils = {
     // --- API Calls ---
     async fetchFiles() {
@@ -33,6 +31,7 @@ app.utils = {
             if (saved.thumbWidth) document.getElementById('thumbnailWidth').value = saved.thumbWidth;
             if (saved.speed) document.getElementById('advanceTime').value = saved.speed;
             if (saved.slideshowShuffle !== undefined) s.slideshowShuffle = saved.slideshowShuffle;
+            if (saved.quickPreview !== undefined) s.quickPreviewEnabled = saved.quickPreview;
         }
         
         const favs = localStorage.getItem('favoriteFiles');
@@ -45,10 +44,72 @@ app.utils = {
         const settings = {
             thumbWidth: document.getElementById('thumbnailWidth').value,
             speed: document.getElementById('advanceTime').value,
-            slideshowShuffle: app.state.slideshowShuffle
+            slideshowShuffle: app.state.slideshowShuffle,
+            quickPreview: app.state.quickPreviewEnabled
         };
         localStorage.setItem('gallerySettings', JSON.stringify(settings));
         localStorage.setItem('favoriteFiles', JSON.stringify(Array.from(app.state.favoriteFiles)));
+    },
+
+    // --- Favorites ---
+    toggleFavorite(fileName, starElement) {
+        if (app.state.favoriteFiles.has(fileName)) {
+            app.state.favoriteFiles.delete(fileName);
+            starElement.classList.remove('is-favorite');
+            starElement.textContent = '☆';
+        } else {
+            app.state.favoriteFiles.add(fileName);
+            starElement.classList.add('is-favorite');
+            starElement.textContent = '★';
+        }
+        this.saveSettings();
+    },
+
+    // --- Quick Preview ---
+    toggleQuickPreview() {
+        // Toggle logic if you have a UI button for it
+        app.state.quickPreviewEnabled = !app.state.quickPreviewEnabled;
+        this.saveSettings();
+    },
+
+    showQuickPreview(fileName) {
+        if (!app.state.quickPreviewEnabled) return;
+        
+        clearTimeout(app.state.quickPreviewTimeout);
+        app.state.quickPreviewTimeout = setTimeout(() => {
+            const mediaInfo = app.state.MEDIA_DATA[fileName];
+            if (!mediaInfo) return;
+            
+            let overlay = document.getElementById('quickPreviewOverlay');
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.id = 'quickPreviewOverlay';
+                overlay.className = 'quick-preview-overlay'; // Defined in style.css
+                document.body.appendChild(overlay);
+            }
+            
+            const mediaEl = mediaInfo.isVideo 
+                ? `<video src="${mediaInfo.url}" autoplay muted loop style="max-width: 100%; max-height: 60vh;"></video>`
+                : `<img src="${mediaInfo.url}" style="max-width: 100%; max-height: 60vh;">`;
+            
+            overlay.innerHTML = `
+                ${mediaEl}
+                <div class="quick-preview-info">
+                    <strong>${mediaInfo.name}</strong><br>
+                    <span style="color: #888;">${this.getFileExtension(mediaInfo.name)}</span>
+                </div>
+            `;
+            overlay.style.display = 'block';
+        }, 300);
+    },
+
+    hideQuickPreview() {
+        clearTimeout(app.state.quickPreviewTimeout);
+        const overlay = document.getElementById('quickPreviewOverlay');
+        if (overlay) {
+            overlay.style.display = 'none';
+            overlay.innerHTML = '';
+        }
     },
 
     // --- Helpers ---
