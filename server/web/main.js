@@ -1,6 +1,7 @@
 *Initialization and Event Listeners.*
+sources).
 
-```javascript
+
 app.main = {
     async init() {
         const grid = document.querySelector('.grid');
@@ -23,7 +24,7 @@ app.main = {
             files.sort((a, b) => a.path.localeCompare(b.path, undefined, {numeric: true}));
             
             files.forEach(f => {
-                const webUrl = `/media/${f.path}`; // Adjust based on your server setup
+                const webUrl = `/media/${f.path}`;
                 app.state.MEDIA_DATA[f.path] = { name: f.name, isVideo: f.isVideo, url: webUrl };
                 app.state.FOLDER_MAP['all'].push(f.path);
                 
@@ -56,6 +57,8 @@ app.main = {
     setupEventListeners() {
         // Scroll for Infinite Load & Controls Hiding
         let lastScrollY = 0;
+        let videoScrollTimeout;
+
         window.addEventListener('scroll', () => {
             const currentY = window.scrollY;
             const controls = document.getElementById('topControls');
@@ -68,6 +71,19 @@ app.main = {
             // Infinite Scroll
             if ((window.innerHeight + currentY) >= document.body.offsetHeight - 500) {
                 app.gallery.loadMore();
+            }
+
+            // Optimize Video Playback on Scroll (Debounced)
+            clearTimeout(videoScrollTimeout);
+            videoScrollTimeout = setTimeout(() => {
+                app.media.managePlayback();
+            }, 100);
+        });
+        
+        // Show controls when mouse near top
+        document.addEventListener('mousemove', (e) => {
+            if (e.clientY < 100) {
+                document.getElementById('topControls').classList.remove('hidden');
             }
         });
 
