@@ -1,0 +1,233 @@
+STYLE SHEET and SCRIPT -- SCRIPT IS AFTER THE STYLE SHEET
+SEE LINE 73 - 
+
+/* JSON Configuration Styles */
+.json-fields-header {
+    border-bottom: 1px solid #333;
+    margin-bottom: 10px;
+    padding-bottom: 5px;
+}
+
+.json-fields-header h4 {
+    margin: 0;
+    color: #4CAF50;
+    font-size: 14px;
+}
+
+.json-fields-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.json-field {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 4px;
+}
+
+.json-field label {
+    min-width: 120px;
+    font-size: 12px;
+    color: #b0b0b0;
+    margin: 0;
+}
+
+.json-field input[type="text"],
+.json-field input[type="number"] {
+    flex: 1;
+    padding: 4px 8px;
+    background: #2a2a2a;
+    border: 1px solid #3a3a3a;
+    border-radius: 4px;
+    color: #e0e0e0;
+    font-size: 12px;
+}
+
+.json-field input[type="checkbox"] {
+    transform: scale(1.2);
+}
+
+.array-field {
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.array-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.array-item {
+    background: #2a2a2a;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+    border: 1px solid #3a3a3a;
+}
+
+
+// ============ JSON CONFIGURATION FUNCTIONS ============
+let currentJsonConfig = null;
+let jsonFields = {};
+
+async function loadJsonConfigs() {
+    try {
+        const response = await fetch('/api/config');
+        const configData = await response.json();
+        
+        const select = document.getElementById('jsonConfigSelect');
+        select.innerHTML = '<option value="">Select Config...</option>';
+        
+        configData.available_configs.forEach(config => {
+            const option = document.createElement('option');
+            option.value = config.filename;
+            option.textContent = config.display_name;
+            select.appendChild(option);
+        });
+        
+        if (configData.current_config) {
+            select.value = configData.current_config.filename;
+            displayJsonFields(configData.fields);
+        }
+        
+    } catch (error) {
+        console.error('Error loading JSON configs:', error);
+    }
+}
+
+function displayJsonFields(fields) {
+    jsonFields = fields;
+    const container = document.getElementById('jsonFieldsContainer');
+    const fieldsList = document.getElementById('jsonFieldsList');
+    
+    if (Object.keys(fields).length === 0) {
+        container.style.display = 'none';
+        return;
+    }
+    
+    fieldsList.innerHTML = '';
+    
+    Object.values(fields).forEach(field => {
+        const fieldDiv = document.createElement('div');
+        fieldDiv.className = `json-field ${field.type === 'array' ? 'array-field' : ''}`;
+        
+        if (field.type === 'array') {
+            fieldDiv.innerHTML = `
+                <label>${field.label}:</label>
+                <div class="array-items">
+                    ${field.value.map(item => 
+                        `<span class="array-item">${item}</span>`
+                    ).join('')}
+                </div>
+            `;
+        } else {
+            let inputHtml = '';
+            switch (field.type) {
+                case 'checkbox':
+                    inputHtml = `<input type="checkbox" data-path="${field.path}" ${field.value ? 'checked' : ''}>`;
+                    break;
+                case 'number':
+                    inputHtml = `<input type="number" data-path="${field.path}" value="${field.value}" step="${field.path.includes('threshold') ? '0.01' : '1'}">`;
+                    break;
+                default:
+                    inputHtml = `<input type="text" data-path="${field.path}" value="${field.value}">`;
+            }
+            
+            fieldDiv.innerHTML = `
+                <label>${field.label}:</label>
+                ${inputHtml}
+            `;
+        }
+        
+        fieldsList.appendChild(fieldDiv);
+    });
+    
+    container.style.display = 'flex';
+}
+
+async function loadJsonConfig(filename) {
+    if (!filename) {
+        document.getElementById('jsonFieldsContainer').style.display = 'none';
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/${filename}`);
+        const config = await response.json();
+        currentJsonConfig = config;
+        
+        // You can now use the config values in your gallery
+        applyJsonConfig(config);
+        
+    } catch (error) {
+        console.error('Error loading JSON config:', error);
+    }
+}
+
+function applyJsonConfig(config) {
+    // Apply configuration to your gallery
+    console.log('Applying JSON config:', config);
+    
+    // Example: Set thresholds if they exist in the config
+    if (config.content_threshold !== undefined) {
+        document.getElementById('contentThresh').value = config.content_threshold;
+    }
+    if (config.negative_threshold !== undefined) {
+        document.getElementById('negThresh').value = config.negative_threshold;
+    }
+    
+    // You can add more configuration applications here
+}
+
+function saveJsonConfig() {
+    if (!currentJsonConfig) return;
+    
+    // Update the config with current field values
+    Object.values(jsonFields).forEach(field => {
+        if (field.type !== 'array') {
+            const input = document.querySelector(`[data-path="${field.path}"]`);
+            if (input) {
+                this.setNestedValue(currentJsonConfig, field.path, 
+                    field.type === 'checkbox' ? input.checked : input.value);
+            }
+        }
+    });
+    
+    // Here you would typically send the updated config back to the server
+    console.log('Updated config:', currentJsonConfig);
+    alert('Config updated (check console). In a real app, this would save to server.');
+}
+
+function setNestedValue(obj, path, value) {
+    const keys = path.split('.');
+    let current = obj;
+    
+    for (let i = 0; i < keys.length - 1; i++) {
+        if (!current[keys[i]]) {
+            current[keys[i]] = {};
+        }
+        current = current[keys[i]];
+    }
+    
+    current[keys[keys.length - 1]] = value;
+}
+
+function refreshJsonConfigs() {
+    loadJsonConfigs();
+}
+
+// Call this in your initialization
+async function initializeGallery() {
+    // ... your existing initialization code ...
+    
+    // Load JSON configs
+    await loadJsonConfigs();
+}
