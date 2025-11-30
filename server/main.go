@@ -1,7 +1,7 @@
 package main
 
 import (
-	"context"  // ADD THIS
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -20,7 +20,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"sync"    // ADD THIS
+	"sync"
 	"time"
 	"fmt"
 )
@@ -186,7 +186,6 @@ func startIdleMonitor() {
     }()
 }
 
-
 func setupRoutes(mediaDir string) {
 	// Serve embedded web files
 	webFS, err := fs.Sub(webFiles, "web")
@@ -301,7 +300,11 @@ func setupRoutes(mediaDir string) {
 			http.Error(w, "Failed to open explorer: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		w.WriteHeader(http.StatusOK)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{
+			"status":  "success", 
+			"message": "File explorer opened",
+		})
 	})
 
 	http.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
@@ -348,7 +351,7 @@ func setupRoutes(mediaDir string) {
 			os.Exit(0)
 		}()
 	})
-}
+} // <-- This was missing in your original code
 
 func getAvailableSources(mediaDir string) []string {
     matches, _ := filepath.Glob(filepath.Join(mediaDir, "*.json"))
@@ -358,22 +361,6 @@ func getAvailableSources(mediaDir string) []string {
     }
     return sources
 }
-	
-http.HandleFunc("/api/quit", func(w http.ResponseWriter, r *http.Request) {
-        if r.Method != "POST" {
-            http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-            return
-        }
-        w.Write([]byte("Server shutting down..."))
-        go func() {
-            time.Sleep(500 * time.Millisecond)
-            os.Exit(0)
-        }()
-    })
-}
-
-
-
 
 func getDetailedFileListAndFolders(dir, source string) ([]FileInfo, []string, error) {
     // 1. Automatic Priority: If no source specified, check for priority manifests
@@ -547,7 +534,6 @@ func loadFromManifest(baseDir, manifestPath string) ([]FileInfo, []string, error
     
     return fileList, dirList, nil
 }
-
 
 func generateOrLoadCertificate() (tls.Certificate, error) {
 	certFile := filepath.Join(os.TempDir(), "mediabrowser_cert.pem")
