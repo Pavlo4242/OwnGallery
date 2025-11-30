@@ -83,16 +83,18 @@ jobs:
           ls -lh resource.res
 
       - name: Build C launcher (x64/arm64)
-        shell: bash   # This is the fix — no more cmd.exe "Terminate batch job?"
+        shell: bash
         run: |
           cd launcher
           echo "Building ${{ matrix.output }}..."
           gcc -O3 -s -static -mwindows \
               -o "../${{ matrix.output }}" launcher.c resource.res \
               -lshlwapi -lole32 -lshell32 -lcomdlg32 -ladvapi32 \
-              -Wl,--high-entropy-va,--dynamicbase,--nxcompat,--large-address-aware
+              -Wl,--high-entropy-va,--dynamicbase,--nxcompat \
+              -Wl,/LARGEADDRESSAWARE \
+              -Wl,--no-insert-timestamp
           cd ..
-          ls -lh ${{ matrix.output }}
+          ls -lh "${{ matrix.output }}"
 
       - name: Create dist package
         run: |
