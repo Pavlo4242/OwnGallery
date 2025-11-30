@@ -174,13 +174,7 @@ jobs:
           path: dist/*
           retention-days: 30
 
-      - name: Print Short SHA
-        # This uses bash string slicing to get the first 7 characters
-        run: echo "Short SHA:${GITHUB_SHA::7}"
-        
-      - name: Print Run number
-        run: echo "This is build number:$GITHUB_RUN_NUMBER"
-
+   
 
   release:
     name: Create Release
@@ -202,8 +196,8 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           name: Release ${{ github.ref_name }}
-          body: |
-            ## Media Gallery Launcher ${{ github.ref_name }{$GITHUB_RUN_NUMBER}}
+         body: |
+            ## Media Gallery Launcher ${{ github.ref_name }} (Build ${{ github.run_number }})
             
             ### 📥 Downloads
             - **Windows (x64)**: MediaGallery.exe
