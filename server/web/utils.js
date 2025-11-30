@@ -1,29 +1,64 @@
-*API calls, LocalStorage, and helper functions.*
+/*Restores: Delete Logic, Multi-select Toggle, Favorites, and Quick Preview.*
+
+
 app.utils = {
     // --- API Calls ---
     async fetchFiles() {
         const response = await fetch('/api/files');
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return await response.json();
     },
-
     async fetchRootPath() {
         try {
             const res = await fetch('/api/root_dir');
-            if (res.ok) {
-                const data = await res.json();
-                document.getElementById('folderName').textContent = data.root_dir;
-            }
-        } catch (e) { console.error("Root path error", e); }
+            if(res.ok) document.getElementById('folderName').textContent = (await res.json()).root_dir;
+        } catch (e) {}
     },
-
     quitServer() {
         if (!confirm('Stop media server?')) return;
-        fetch('/api/quit', { method: 'POST' })
-            .then(() => document.body.innerHTML = '<h1 style="color:red;text-align:center">Server Stopped</h1>');
+        fetch('/api/quit', { method: 'POST' }).then(() => document.body.innerHTML = '<h1>Server Stopped</h1>');
     },
 
-    // --- Settings & Storage ---
+    // --- Selection & Deletion ---
+    toggleMultiSelect() {
+        app.state.multiSelectMode = !app.state.multiSelectMode;
+        // Re-render current view to show/hide checkboxes
+        app.gallery.filterByFolder(false);
+        if (!app.state.multiSelectMode) {
+            app.state.selectedFiles.clear();
+            this.updateDeleteBtn();
+        }
+    },
+    toggleSelection(fileName, itemDom, isChecked) {
+        if (isChecked) {
+            app.state.selectedFiles.add(fileName);
+            itemDom.classList.add('selected');
+        } else {
+            app.state.selectedFiles.delete(fileName);
+            itemDom.classList.remove('selected');
+        }
+        this.updateDeleteBtn();
+    },
+    updateDeleteBtn() {
+        const btn = document.getElementById('deleteBtn');
+        if (btn) btn.style.display = app.state.selectedFiles.size > 0 ? 'inline-block' : 'none';
+        const count = document.getElementById('selectedCount');
+        if (count) count.textContent = app.state.selectedFiles.size;
+    },
+    async deleteSelected() {
+        if (app.state.selectedFiles.size === 0 || !confirm(`Delete ${app.state.selectedFiles.size} files?`)) return;
+        
+        for (const path of app.state.selectedFiles) {
+            await fetch('/api/delete', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ path })
+            });
+        }
+        app.state.selectedFiles.clear();
+        app.main.init(); // Reload
+    },
+
+    // --- Settings & Favorites ---
     loadSettings() {
         const s = app.state;
         const saved = JSON.parse(localStorage.getItem('gallerySettings'));
@@ -32,26 +67,23 @@ app.utils = {
             if (saved.speed) document.getElementById('advanceTime').value = saved.speed;
             if (saved.slideshowShuffle !== undefined) s.slideshowShuffle = saved.slideshowShuffle;
             if (saved.quickPreview !== undefined) s.quickPreviewEnabled = saved.quickPreview;
+            if (saved.viewMode) s.viewMode = saved.viewMode;
         }
-        
         const favs = localStorage.getItem('favoriteFiles');
         if (favs) s.favoriteFiles = new Set(JSON.parse(favs));
-        
         this.updateShuffleUI();
     },
-
     saveSettings() {
         const settings = {
             thumbWidth: document.getElementById('thumbnailWidth').value,
             speed: document.getElementById('advanceTime').value,
             slideshowShuffle: app.state.slideshowShuffle,
-            quickPreview: app.state.quickPreviewEnabled
+            quickPreview: app.state.quickPreviewEnabled,
+            viewMode: app.state.viewMode
         };
         localStorage.setItem('gallerySettings', JSON.stringify(settings));
         localStorage.setItem('favoriteFiles', JSON.stringify(Array.from(app.state.favoriteFiles)));
     },
-
-    // --- Favorites ---
     toggleFavorite(fileName, starElement) {
         if (app.state.favoriteFiles.has(fileName)) {
             app.state.favoriteFiles.delete(fileName);
@@ -65,69 +97,38 @@ app.utils = {
         this.saveSettings();
     },
 
-    // --- Quick Preview ---
-    toggleQuickPreview() {
-        // Toggle logic if you have a UI button for it
-        app.state.quickPreviewEnabled = !app.state.quickPreviewEnabled;
-        this.saveSettings();
-    },
-
+    // --- Preview & Helpers ---
     showQuickPreview(fileName) {
         if (!app.state.quickPreviewEnabled) return;
-        
         clearTimeout(app.state.quickPreviewTimeout);
         app.state.quickPreviewTimeout = setTimeout(() => {
-            const mediaInfo = app.state.MEDIA_DATA[fileName];
-            if (!mediaInfo) return;
-            
+            const info = app.state.MEDIA_DATA[fileName];
             let overlay = document.getElementById('quickPreviewOverlay');
             if (!overlay) {
                 overlay = document.createElement('div');
                 overlay.id = 'quickPreviewOverlay';
-                overlay.className = 'quick-preview-overlay'; // Defined in style.css
+                overlay.className = 'quick-preview-overlay';
                 document.body.appendChild(overlay);
             }
-            
-            const mediaEl = mediaInfo.isVideo 
-                ? `<video src="${mediaInfo.url}" autoplay muted loop style="max-width: 100%; max-height: 60vh;"></video>`
-                : `<img src="${mediaInfo.url}" style="max-width: 100%; max-height: 60vh;">`;
-            
-            overlay.innerHTML = `
-                ${mediaEl}
-                <div class="quick-preview-info">
-                    <strong>${mediaInfo.name}</strong><br>
-                    <span style="color: #888;">${this.getFileExtension(mediaInfo.name)}</span>
-                </div>
-            `;
+            const media = info.isVideo ? `<video src="${info.url}" autoplay muted loop></video>` : `<img src="${info.url}">`;
+            overlay.innerHTML = `${media}<div class="quick-preview-info">${info.name}</div>`;
             overlay.style.display = 'block';
         }, 300);
     },
-
     hideQuickPreview() {
         clearTimeout(app.state.quickPreviewTimeout);
-        const overlay = document.getElementById('quickPreviewOverlay');
-        if (overlay) {
-            overlay.style.display = 'none';
-            overlay.innerHTML = '';
-        }
+        const ov = document.getElementById('quickPreviewOverlay');
+        if (ov) ov.style.display = 'none';
     },
-
-    // --- Helpers ---
     toggleSlideshowShuffle() {
         app.state.slideshowShuffle = !app.state.slideshowShuffle;
         this.updateShuffleUI();
         this.saveSettings();
     },
-
     updateShuffleUI() {
         const btn = document.getElementById('toggleShuffleBtn');
         if (btn) btn.textContent = app.state.slideshowShuffle ? '🔀 Shuffle: ON' : '🔀 Shuffle: OFF';
     },
-
-    getFileExtension(fileName) {
-        return fileName.split('.').pop().toUpperCase();
-    },
-
     shuffleArray(array) {
         for (let i = array.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
