@@ -461,7 +461,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     CreateDirectory(tempExePath, NULL);
 
     // Always use a fully unique server exe name
-   snprintf(serverExePath, sizeof(serverExePath), "%sserver.bin", tempExePath);
+   snprintf(serverExePath, sizeof(serverExePath), "%sserver.exe", tempExePath);
 
 
 
