@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-		<html lang="en">
-		<head>
-			<meta charset="UTF-8">
-			<meta name="viewport" content="width=device-width, initial-scale=1.0">
-			<title>Media Gallery</title>
-	
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Media Gallery</title>
+
 <!-- STYLES SECTION -->
 <style>
     /* ============ RESET & BASE STYLES ============ */
@@ -15,239 +15,237 @@
         user-select: none;
     }
 
-			body {
-				font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-				margin: 0;
-				background-color: #0a0a0a;
-				color: #e0e0e0;
-			}
-  			/* --- MODE SELECTOR --- */
-			.mode-selector {
-				display: flex;
-				gap: 5px;
-				padding: 8px;
-				background: #1a1a1a;
-				border-bottom: 1px solid #333;
-			}
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        margin: 0;
+        background-color: #0a0a0a;
+        color: #e0e0e0;
+    }
+    /* --- MODE SELECTOR --- */
+    .mode-selector {
+        display: flex;
+        gap: 5px;
+        padding: 8px;
+        background: #1a1a1a;
+        border-bottom: 1px solid #333;
+    }
 
-			.mode-btn {
-				padding: 8px 16px;
-				border: none;
-				border-radius: 6px;
-				cursor: pointer;
-				font-weight: bold;
-				transition: all 0.3s;
-				flex: 1;
-			}
+    .mode-btn {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: bold;
+        transition: all 0.3s;
+        flex: 1;
+    }
 
-			.mode-btn.active {
-				transform: translateY(-2px);
-				box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-			}
+    .mode-btn.active {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
 
-			.mode-sorting { background: #2d5b2d; color: white; }
-			.mode-sorting.active { background: #4CAF50; }
+    .mode-sorting { background: #2d5b2d; color: white; }
+    .mode-sorting.active { background: #4CAF50; }
 
-			.mode-comparing { background: #5b4a2d; color: white; }
-			.mode-comparing.active { background: #FF9800; }
+    .mode-comparing { background: #5b4a2d; color: white; }
+    .mode-comparing.active { background: #FF9800; }
 
-			.mode-browsing { background: #2d4a5b; color: white; }
-			.mode-browsing.active { background: #2196F3; }
+    .mode-browsing { background: #2d4a5b; color: white; }
+    .mode-browsing.active { background: #2196F3; }
 
-			/* --- CONTROLS STYLING - MODE SPECIFIC --- */
-			.controls {
-				padding: 5px 10px;
-				background: linear-gradient(135deg, #1e1e1e 0%, #2d2d2d 100%);
-				border-bottom: 1px solid #3a3a3a;
-				max-height: 46px;
-				overflow: hidden;
-				transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s;
-				opacity: 0.95;
-				position: fixed;
-				top: 46px; /* Below mode selector */
-				width: 100%;
-				z-index: 100;
-				backdrop-filter: blur(10px);
-				display: flex;
-				align-items: center;
-				justify-content: space-between;
-				flex-wrap: wrap;
-				gap: 10px;
-				box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-			}
+    /* --- CONTROLS STYLING - MODE SPECIFIC --- */
+    .controls {
+        padding: 5px 10px;
+        background: linear-gradient(135deg, #1e1e1e 0%, #2d2d2d 100%);
+        border-bottom: 1px solid #3a3a3a;
+        max-height: 46px;
+        overflow: hidden;
+        transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s;
+        opacity: 0.95;
+        position: fixed;
+        top: 46px; /* Below mode selector */
+        width: 100%;
+        z-index: 100;
+        backdrop-filter: blur(10px);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 10px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    }
 
-			.controls:hover {
-				max-height: 400px;
-				opacity: 1;
-				box-shadow: 0 10px 30px rgba(0,0,0,0.8);
-			}
+    .controls:hover {
+        max-height: 400px;
+        opacity: 1;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+    }
 
-			.controls-group {
-				display: flex;
-				align-items: center;
-				gap: 8px;
-				background: rgba(0,0,0,0.2);
-				padding: 3px 8px;
-				border-radius: 8px;
-				border: 1px solid #3a3a3a;
-			}
+    .controls-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: rgba(0,0,0,0.2);
+        padding: 3px 8px;
+        border-radius: 8px;
+        border: 1px solid #3a3a3a;
+    }
 
-			/* Mode-specific control visibility */
-			.sorting-controls { display: flex; }
-			.comparing-controls { display: none; }
-			.browsing-controls { display: none; }
+    /* Mode-specific control visibility */
+    .sorting-controls { display: flex; }
+    .comparing-controls { display: none; }
+    .browsing-controls { display: none; }
 
-			/* Comparing mode specific styles */
-			.comparing-pair {
-				display: flex;
-				gap: 20px;
-				padding: 20px;
-				justify-content: center;
-				align-items: center;
-				min-height: 80vh;
-			}
+    /* Comparing mode specific styles */
+    .comparing-pair {
+        display: flex;
+        gap: 20px;
+        padding: 20px;
+        justify-content: center;
+        align-items: center;
+        min-height: 80vh;
+    }
 
-			.compare-item {
-				max-width: 45%;
-				border: 3px solid transparent;
-				border-radius: 12px;
-				transition: all 0.3s;
-				cursor: pointer;
-			}
+    .compare-item {
+        max-width: 45%;
+        border: 3px solid transparent;
+        border-radius: 12px;
+        transition: all 0.3s;
+        cursor: pointer;
+    }
 
-			.compare-item.selected {
-				border-color: #4CAF50;
-				box-shadow: 0 0 30px rgba(76, 175, 80, 0.5);
-			}
+    .compare-item.selected {
+        border-color: #4CAF50;
+        box-shadow: 0 0 30px rgba(76, 175, 80, 0.5);
+    }
 
-			.compare-item img,
-			.compare-item video {
-				width: 100%;
-				height: auto;
-				border-radius: 8px;
-			}
+    .compare-item img,
+    .compare-item video {
+        width: 100%;
+        height: auto;
+        border-radius: 8px;
+    }
 
-			.compare-info {
-				text-align: center;
-				margin-top: 10px;
-				padding: 10px;
-				background: rgba(0,0,0,0.7);
-				border-radius: 6px;
-			}
+    .compare-info {
+        text-align: center;
+        margin-top: 10px;
+        padding: 10px;
+        background: rgba(0,0,0,0.7);
+        border-radius: 6px;
+    }
 
-			.comparison-stats {
-				text-align: center;
-				padding: 20px;
-				background: #1a1a1a;
-				margin: 20px;
-				border-radius: 12px;
-			}
+    .comparison-stats {
+        text-align: center;
+        padding: 20px;
+        background: #1a1a1a;
+        margin: 20px;
+        border-radius: 12px;
+    }
 
-			/* Browsing mode specific */
-			.browsing-info-panel {
-				position: fixed;
-				right: 20px;
-				top: 100px;
-				width: 300px;
-				background: rgba(0,0,0,0.9);
-				padding: 15px;
-				border-radius: 12px;
-				border-left: 4px solid #2196F3;
-				z-index: 99;
-			}
+    /* Browsing mode specific */
+    .browsing-info-panel {
+        position: fixed;
+        right: 20px;
+        top: 100px;
+        width: 300px;
+        background: rgba(0,0,0,0.9);
+        padding: 15px;
+        border-radius: 12px;
+        border-left: 4px solid #2196F3;
+        z-index: 99;
+    }
 
-            /* AI Counters */
-			.ai-counters { display: flex; gap: 10px; font-size: 12px; font-weight: bold; }
-            .shutdown { background-color: #5a1e1e !important; color: white !important; }
-            .shutdown:hover { background-color: #7a2e2e !important; }
+    /* AI Counters */
+    .ai-counters { display: flex; gap: 10px; font-size: 12px; font-weight: bold; }
+    .shutdown { background-color: #5a1e1e !important; color: white !important; }
+    .shutdown:hover { background-color: #7a2e2e !important; }
 
-	
-			.controls.hidden {
-				transform: translateY(-100%);
-				opacity: 0;
-				pointer-events: none;
-			}
+    .controls.hidden {
+        transform: translateY(-100%);
+        opacity: 0;
+        pointer-events: none;
+    }
 
-			.controls-left, .controls-center, .controls-right {
-				display: flex;
-				align-items: center;
-				gap: 10px;
-				flex-wrap: wrap;
-			}
+    .controls-left, .controls-center, .controls-right {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
 
-			.controls-center {
-				flex: 1;
-				justify-content: center;
-			}
+    .controls-center {
+        flex: 1;
+        justify-content: center;
+    }
 
-			.current-folder {
-				background-color: rgba(76, 175, 80, 0.2);
-				border: 1px solid #4CAF50;
-				padding: 8px 16px;
-				border-radius: 6px;
-				color: #4CAF50;
-				font-weight: 500;
-				display: flex;
-				align-items: center;
-				gap: 8px;
-				max-width: 300px;
-				overflow: hidden;
-				cursor: pointer;
-			}
-			
-			.current-folder-path {
-				white-space: nowrap;
-				overflow: hidden;
-				text-overflow: ellipsis;
-			}
+    .current-folder {
+        background-color: rgba(76, 175, 80, 0.2);
+        border: 1px solid #4CAF50;
+        padding: 8px 16px;
+        border-radius: 6px;
+        color: #4CAF50;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        max-width: 300px;
+        overflow: hidden;
+        cursor: pointer;
+    }
+    
+    .current-folder-path {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
 
-			.file-counter {
-				background-color: rgba(33, 150, 243, 0.2);
-				border: 1px solid #2196F3;
-				padding: 8px 16px;
-				border-radius: 6px;
-				color: #2196F3;
-				font-weight: 500;
-			}
+    .file-counter {
+        background-color: rgba(33, 150, 243, 0.2);
+        border: 1px solid #2196F3;
+        padding: 8px 16px;
+        border-radius: 6px;
+        color: #2196F3;
+        font-weight: 500;
+    }
 
-			.nav-controls {
-				display: flex;
-				gap: 5px;
-				margin-left: 5px;
-			}
+    .nav-controls {
+        display: flex;
+        gap: 5px;
+        margin-left: 5px;
+    }
 
-			.controls label {
-				margin-right: 10px;
-				color: #b0b0b0;
-			}
+    .controls label {
+        margin-right: 10px;
+        color: #b0b0b0;
+    }
 
-			.controls input[type="range"] {
-				width: 200px;
-				vertical-align: middle;
-			}
+    .controls input[type="range"] {
+        width: 200px;
+        vertical-align: middle;
+    }
 
-			.controls select,
-			.controls button {
-				padding: 8px 16px;
-				background-color: #2a2a2a;
-				color: #e0e0e0;
-				border: 1px solid #3a3a3a;
-				border-radius: 6px;
-				cursor: pointer;
-				transition: all 0.2s;
-			}
+    .controls select,
+    .controls button {
+        padding: 8px 16px;
+        background-color: #2a2a2a;
+        color: #e0e0e0;
+        border: 1px solid #3a3a3a;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
 
-			.controls button:hover {
-				background-color: #3a3a3a;
-				border-color: #4a4a4a;
-			}
+    .controls button:hover {
+        background-color: #3a3a3a;
+        border-color: #4a4a4a;
+    }
 
-			.controls button:disabled {
-				opacity: 0.5;
-				cursor: not-allowed;
-			}
-			
-		
+    .controls button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    
     .grid {
         margin: 20px;
         min-height: 100vh;
@@ -285,8 +283,7 @@
         min-height: 100px;
         background-color: #222;
     }
-	
-	
+    
     .folder-card {
         background: #2d2d2d;
         border: 1px solid #3a3a3a;
@@ -342,8 +339,7 @@
         color: #888;
         font-size: 10px;
     }
-	
-	
+    
     .fullscreen-overlay {
         position: fixed;
         top: 0;
@@ -525,8 +521,7 @@
         background-color: #4CAF50;
         border-color: #4CAF50;
     }
-	
-	
+    
     .loading {
         text-align: center;
         padding: 60px;
@@ -600,8 +595,7 @@
         background-color: rgba(76, 175, 80, 0.8);
         border-color: #4CAF50;
     }
-	
-
+    
     .list-view {
         display: flex;
         flex-direction: column;
@@ -649,8 +643,7 @@
         font-size: 12px;
         color: #888;
     }
-	
-	
+    
     .grid-item-checkbox {
         position: absolute;
         top: 8px;
@@ -675,8 +668,7 @@
         outline: 3px solid #ff9800;
         outline-offset: -3px;
     }
-	
-	
+    
     .favorite-star {
         position: absolute;
         bottom: 8px;
@@ -712,8 +704,7 @@
         background-color: rgba(255, 215, 0, 0.2);
         opacity: 1;
     }
-	
-
+    
     .quick-preview-overlay {
         position: fixed;
         top: 50%;
@@ -745,8 +736,7 @@
         color: white;
         font-size: 14px;
     }
-	
-	
+    
     .vertical-progress-bar {
         position: fixed;
         left: 0;
@@ -770,8 +760,7 @@
         transition: height 0.1s linear;
         height: 0%;
     }
-	
-	
+    
     .view-mode-toggle {
         display: flex;
         gap: 5px;
@@ -799,8 +788,7 @@
     .view-mode-btn:hover:not(.active) {
         background-color: #3a3a3a;
     }
-	
-	
+    
     .nav-fab-container {
         position: fixed;
         bottom: 30px;
@@ -833,8 +821,7 @@
         transform: scale(1.1);
         box-shadow: 0 6px 20px rgba(33, 150, 243, 0.5);
     }
-	
-	
+    
     .delete-btn {
         background-color: rgba(244, 67, 54, 0.2) !important;
         border: 1px solid #f44336 !important;
@@ -844,8 +831,7 @@
     .delete-btn:hover {
         background-color: rgba(244, 67, 54, 0.3) !important;
     }
-	
-	
+    
     .fullscreen-dir {
         position: absolute;
         top: 100px;
@@ -902,8 +888,7 @@
         text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
         box-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
     }
-	
-	</style>
+</style>
 </head>
 
 <!-- HTML STRUCTURE SECTION -->
@@ -921,9 +906,9 @@
         </button>
     </div>
 
-    <div class="controls">
+    <div class="controls" id="topControls">
         <div class="controls-group sorting-controls">
-            <div class="current-folder" id="currentFolder">📁 <span id="folderName">Loading...</span></div>
+            <div class="current-folder" id="currentFolder" onclick="openExplorerAndShowPath()">📁 <span id="folderName">Loading...</span></div>
             <div class="file-counter" id="fileCounter">0</div>
             <div class="ai-counters">
                 <span style="color:#4CAF50">✅ <span id="keepCount">0</span></span>
@@ -934,6 +919,25 @@
         <div class="controls-group sorting-controls">
             <label>Cols:</label> <input type="range" id="thumbnailWidth" min="150" max="400" value="250" onchange="updateThumbnailSize()">
             <button onclick="initializeGallery()">🔄</button>
+        </div>
+        
+        <div class="controls-group sorting-controls">
+             <div class="view-mode-toggle">
+                <button class="view-mode-btn active" id="gridViewBtn" onclick="setViewMode('grid')" title="Grid View">⊞</button>
+                <button class="view-mode-btn" id="listViewBtn" onclick="setViewMode('list')" title="List View">≣</button>
+            </div>
+        </div>
+        
+         <div class="controls-group sorting-controls">
+            <label>Select:</label>
+            <input type="checkbox" id="multiSelectToggle" onchange="toggleMultiSelect()">
+            <span id="selectedCount" style="margin-left: 5px; font-weight: bold;">0</span>
+            <button id="deleteBtn" class="delete-btn" style="display: none; margin-left: 5px;" onclick="deleteSelected()">🗑️</button>
+        </div>
+        
+        <div class="controls-group sorting-controls">
+            <label>Quick Preview:</label>
+            <input type="checkbox" id="quickPreviewToggle" onchange="toggleQuickPreview()">
         </div>
 
         <div class="controls-group sorting-controls">
@@ -967,17 +971,25 @@
             <select id="folderFilter" onchange="filterGalleryByFolder()">
                 <option value="all">All Folders</option>
             </select>
+            <div class="nav-controls">
+                <button id="navBackBtn" onclick="navigateBack()" disabled>◀</button>
+                <button id="navForwardBtn" onclick="navigateForward()" disabled>▶</button>
+                <button onclick="navigateUp()">⬆</button>
+            </div>
+             <label style="margin-left: 10px;">Sort:</label>
+            <input type="checkbox" id="shuffleToggle" onchange="filterGalleryByFolder()">
+             <button onclick="filterFavorites()" style="color: #ffd700;">★</button>
         </div>
 
         <div class="controls-group">
             <button onclick="quitServer()" class="shutdown">⏻ Shutdown</button>
         </div>
     </div>
-	
-	   <!-- ============ MAIN GALLERY CONTENT ============ -->
+    
+       <!-- ============ MAIN GALLERY CONTENT ============ -->
     <div class="grid"></div>
 
-	<div id="sortingContent" class="content-area">
+    <div id="sortingContent" class="content-area">
         <div class="grid"></div>
         <div class="scroll-progress" id="scrollProgress">
             Loaded: <span id="loadedCount">0</span> / <span id="totalCount">0</span>
@@ -1008,8 +1020,8 @@
     <div class="scroll-progress" id="scrollProgress">
         Loaded: <span id="loadedCount">0</span> / <span id="totalCount">0</span>
     </div>
-	
-	   <!-- ============ FULLSCREEN OVERLAY ============ -->
+    
+       <!-- ============ FULLSCREEN OVERLAY ============ -->
     <div id="fullscreenOverlay" class="fullscreen-overlay">
         <span class="top-left-close" onclick="closeFullscreen()">&times;</span>
         
@@ -1028,8 +1040,8 @@
             <div class="media-filename"></div>
             <div class="media-filetype"></div>
         </div>
-		
-		   <!-- ============ PLAYBACK CONTROLS ============ -->
+        
+           <!-- ============ PLAYBACK CONTROLS ============ -->
         <div class="playback-controls" id="playbackControls">
             <button id="playPauseBtn">▶ Play</button>
             <button id="toggleShuffleBtn" onclick="toggleShuffleInSlideshow()">🔀 Shuffle: OFF</button>
@@ -1049,8 +1061,8 @@
             <button onclick="closeFullscreen()">↩ Back to Gallery</button>
             <button onclick="scrollToTop()">↑ Back to Top</button>
         </div>
-		
-		     <!-- ============ FULLSCREEN NAVIGATION ============ -->
+        
+             <!-- ============ FULLSCREEN NAVIGATION ============ -->
         <div style="position: absolute; bottom: 30px; right: 30px; display: flex; gap: 10px;">
             <button class="bottom-right-root" style="position: relative; bottom: auto; right: auto;" onclick="navigateUp()">↑ Parent</button>
             <button class="bottom-right-root" style="position: relative; bottom: auto; right: auto;" onclick="returnToRootFromFullscreen()">■ Return to Root</button>
@@ -1061,1423 +1073,26 @@
             <div class="vertical-progress-fill" id="progressFill"></div>
         </div>
     </div>
-	
-	  <!-- ============ NAVIGATION FAB BUTTONS ============ -->
+    
+      <!-- ============ NAVIGATION FAB BUTTONS ============ -->
     <div class="nav-fab-container" id="navFabs">
         <div class="nav-fab" onclick="scrollToTop()" title="Back to Top">⌂</div>
         <div class="nav-fab" onclick="scrollByAmount(800)" title="Scroll Down">↓</div>
         <div class="nav-fab" onclick="scrollByAmount(2400)" title="Scroll Fast">⇟</div>
     </div>
-	
-	   <!-- ============ EXTERNAL LIBRARIES ============ -->
+    
+    <!-- ============ EXTERNAL LIBRARIES ============ -->
     <script src="masonry.pkgd.min.js"></script>
     <script src="imagesloaded.pkgd.min.js"></script>
-	
-	
-<script>
-    // ============ GLOBAL VARIABLES ============
-// --- GLOBAL VARIABLES ---
-        let currentMode = 'sorting';
-        let allMediaFiles = [];
-        let MEDIA_DATA = {};
-        let SCORE_DATA = {};
-        let FOLDER_MAP = {};
-        let allDirectories = [];
-        let masonry;
-        let loadedMediaCount = 0;
-        const filesPerLoad = 30;
-        let currentMediaIndex = -1;
-        let autoAdvanceInterval = null;
-        let isPlaying = false;
-        let viewedFiles = new Set();
-        let controlsHideTimer = null;
-        let currentRootPath = 'Loading...';
-        let globalVolume = 1.0;
-        let slideshowShuffle = false;
-        let viewMode = 'grid';
-        let multiSelectMode = false;
-        let selectedFiles = new Set();
-        let favoriteFiles = new Set();
-        let quickPreviewEnabled = false;
-        let quickPreviewTimeout = null;
-        let sequentialMode = true;
-        let videoPlayLimit = 5;
-        let animObserver = null;
-        let hoveredMedia = null;
-        let overlayTransitioning = false; 
-        
-        let comparisonPairs = [];
-        let comparisonResults = [];
-        
-        // --- MODE MANAGEMENT ---
-        function setMode(mode) {
-            currentMode = mode;
-            
-            // Update mode buttons
-            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
-            document.querySelector(`.mode-${mode}`).classList.add('active');
-            
-            // Show/hide content areas
-            document.querySelectorAll('.content-area').forEach(area => area.style.display = 'none');
-            document.getElementById(`${mode}Content`).style.display = 'block';
-            
-            // Show/hide controls
-            document.querySelectorAll('.controls-group').forEach(group => group.style.display = 'none');
-            document.querySelectorAll(`.${mode}-controls`).forEach(group => group.style.display = 'flex');
-            
-            // Initialize mode-specific features
-            switch(mode) {
-                case 'sorting':
-                    initializeSortingMode();
-                    break;
-                case 'comparing':
-                    initializeComparingMode();
-                    break;
-                case 'browsing':
-                    initializeBrowsingMode();
-                    break;
-            }
-        }
-
-        function initializeSortingMode() {
-            // Your existing sorting functionality
-            if (allMediaFiles.length === 0) {
-                initializeGallery();
-            }
-        }
-
-        function initializeComparingMode() {
-            // Generate comparison pairs from similar images
-            generateComparisonPairs();
-            loadNewComparisonPair();
-        }
-
-        function initializeBrowsingMode() {
-            // Display all images without AI filtering
-            displayBrowsingGallery();
-        }
-
-        // --- COMPARING MODE FUNCTIONS ---
-        function generateComparisonPairs() {
-            comparisonPairs = [];
-            
-            // Group images by similarity (using CLIP cluster data if available)
-            const similarityGroups = {};
-            
-            allMediaFiles.forEach(path => {
-                const media = MEDIA_DATA[path];
-                const scores = SCORE_DATA[media.name]; // Use name as key based on existing structure
-                const clusterId = scores?.cluster_id || 'unknown';
-                
-                if (!similarityGroups[clusterId]) {
-                    similarityGroups[clusterId] = [];
-                }
-                similarityGroups[clusterId].push(path);
-            });
-            
-            // Create pairs from groups with 2+ similar images
-            Object.values(similarityGroups).forEach(group => {
-                if (group.length >= 2) {
-                    // Shuffle and create pairs
-                    const shuffled = [...group].sort(() => Math.random() - 0.5);
-                    for (let i = 0; i < shuffled.length - 1; i += 2) {
-                        comparisonPairs.push([shuffled[i], shuffled[i + 1]]);
-                    }
-                }
-            });
-            
-            console.log(`Generated ${comparisonPairs.length} comparison pairs`);
-        }
-
-        function loadNewComparisonPair() {
-            if (comparisonPairs.length === 0) {
-                document.getElementById('comparisonPair').innerHTML = '<div style="color:#666; text-align:center; padding:50px;">No more comparison pairs available</div>';
-                return;
-            }
-            
-            const pair = comparisonPairs.pop();
-            const [path1, path2] = pair;
-            
-            const html = `
-                <div class="compare-item" onclick="selectForKeep('${path1}')" data-path="${path1}">
-                    ${createMediaElement(path1).outerHTML}
-                    <div class="compare-info">${MEDIA_DATA[path1].name}</div>
-                </div>
-                <div style="color:#666; align-self:center;">VS</div>
-                <div class="compare-item" onclick="selectForKeep('${path2}')" data-path="${path2}">
-                    ${createMediaElement(path2).outerHTML}
-                    <div class="compare-info">${MEDIA_DATA[path2].name}</div>
-                </div>
-            `;
-            
-            document.getElementById('comparisonPair').innerHTML = html;
-            updateComparisonStats();
-        }
-
-        function selectForKeep(selectedPath) {
-            // Mark the selected one as keep, the other as discard
-            const pairContainer = document.getElementById('comparisonPair');
-            const items = pairContainer.querySelectorAll('.compare-item');
-            
-            items.forEach(item => {
-                item.classList.remove('selected');
-                if (item.dataset.path === selectedPath) {
-                    item.classList.add('selected');
-                    // Store decision
-                    comparisonResults.push({
-                        keep: selectedPath,
-                        discard: items.find(i => i.dataset.path !== selectedPath)?.dataset.path,
-                        timestamp: new Date().toISOString()
-                    });
-                }
-            });
-            
-            // Auto-advance after short delay
-            setTimeout(() => {
-                if (comparisonPairs.length > 0) {
-                    loadNewComparisonPair();
-                }
-            }, 1000);
-        }
-
-        function markBothForKeep() {
-            const pairContainer = document.getElementById('comparisonPair');
-            const items = pairContainer.querySelectorAll('.compare-item');
-            const paths = Array.from(items).map(item => item.dataset.path);
-            
-            comparisonResults.push({
-                keep: paths.join(','),
-                discard: null,
-                timestamp: new Date().toISOString()
-            });
-            
-            if (comparisonPairs.length > 0) {
-                loadNewComparisonPair();
-            }
-        }
-
-        function markBothForDiscard() {
-            const pairContainer = document.getElementById('comparisonPair');
-            const items = pairContainer.querySelectorAll('.compare-item');
-            const paths = Array.from(items).map(item => item.dataset.path);
-            
-            comparisonResults.push({
-                keep: null,
-                discard: paths.join(','),
-                timestamp: new Date().toISOString()
-            });
-            
-            if (comparisonPairs.length > 0) {
-                loadNewComparisonPair();
-            }
-        }
-
-        function updateComparisonStats() {
-            document.getElementById('comparisonCount').textContent = comparisonResults.length;
-            document.getElementById('decisionCount').textContent = comparisonPairs.length;
-        }
-
-        // --- BROWSING MODE FUNCTIONS ---
-        function displayBrowsingGallery() {
-            const grid = document.getElementById('browsingGrid');
-            grid.innerHTML = '';
-            
-            // Show all images without AI filtering
-            const elements = allMediaFiles.map(path => {
-                const item = document.createElement('div');
-                item.className = 'grid-item';
-                item.style.width = document.getElementById('thumbnailWidth').value + 'px';
-                item.appendChild(createMediaElement(path));
-                item.onclick = () => openFullscreen(path);
-                return item;
-            });
-            grid.append(...elements);
-            
-            // Initialize Masonry for browsing grid if needed
-            new Masonry(grid, {
-                itemSelector: '.grid-item',
-                columnWidth: parseInt(document.getElementById('thumbnailWidth').value),
-                gutter: 15,
-                fitWidth: true
-            });
-            
-            // Calculate browsing stats
-            updateBrowsingStats();
-        }
-
-        function updateBrowsingStats() {
-            const clusterSizes = {};
-            Object.values(SCORE_DATA).forEach(score => {
-                const clusterId = score.cluster_id || 'unknown';
-                clusterSizes[clusterId] = (clusterSizes[clusterId] || 0) + 1;
-            });
-            
-            const uniqueScenes = Object.keys(clusterSizes).length;
-            const avgClusterSize = uniqueScenes > 0 ? (allMediaFiles.length / uniqueScenes) : 0;
-            
-            document.getElementById('browseTotalCount').textContent = allMediaFiles.length;
-            document.getElementById('browseSceneCount').textContent = uniqueScenes;
-            document.getElementById('browseAvgCluster').textContent = avgClusterSize.toFixed(1);
-        }
-
-        function toggleInfoPanel() {
-            const panel = document.getElementById('browsingInfoPanel');
-            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-        }
-
-        function shuffleGallery() {
-            // Shuffle and re-render browsing gallery
-            allMediaFiles = [...allMediaFiles].sort(() => Math.random() - 0.5);
-            displayBrowsingGallery();
-        }
-
-    // Navigation History Variables
-    let navigationHistory = [];
-    let historyIndex = -1;
-	
-	// ============ INITIALIZATION FUNCTIONS ============
-    function updateSequentialModeUI() {
-        const btn = document.getElementById('sequentialModeBtn');
-        const modeText = document.getElementById('modeText');
-        if (btn && modeText) {
-            modeText.textContent = sequentialMode ? 'Sequential' : 'Random';
-            if (sequentialMode) {
-                btn.classList.remove('active');
-            } else {
-                btn.classList.add('active');
-            }
-        }
-    }
-
-    function loadFavorites() {
-        const saved = localStorage.getItem('favoriteFiles');
-        if (saved) {
-            favoriteFiles = new Set(JSON.parse(saved));
-        }
-    }
-
-    function saveFavorites() {
-        localStorage.setItem('favoriteFiles', JSON.stringify(Array.from(favoriteFiles)));
-    }
-
-    function saveSettings() {
-        const settings = {
-            thumbWidth: document.getElementById('thumbnailWidth').value,
-            shuffle: document.getElementById('shuffleToggle').checked,
-            speed: document.getElementById('advanceTime').value,
-            slideshowShuffle: slideshowShuffle,
-            quickPreview: document.getElementById('quickPreviewToggle').checked,
-            viewMode: viewMode,
-            sequentialMode: sequentialMode
-        };
-        localStorage.setItem('gallerySettings', JSON.stringify(settings));
-    }
-
-    function loadSettings() {
-        const saved = JSON.parse(localStorage.getItem('gallerySettings'));
-		if (saved) {
-            if (saved.thumbWidth) document.getElementById('thumbnailWidth').value = saved.thumbWidth;
-            // Shuffle is off by default
-            // if (saved.shuffle) document.getElementById('shuffleToggle').checked = saved.shuffle;
-            if (saved.speed) document.getElementById('advanceTime').value = saved.speed;
-            if (saved.slideshowShuffle !== undefined) {
-                slideshowShuffle = saved.slideshowShuffle;
-                updateShuffleButtonText();
-            }
-            if (saved.quickPreview !== undefined) {
-                quickPreviewEnabled = saved.quickPreview;
-                document.getElementById('quickPreviewToggle').checked = saved.quickPreview;
-            }
-            if (saved.viewMode) {
-                viewMode = saved.viewMode;
-            }
-            if (saved.sequentialMode !== undefined) {
-                sequentialMode = saved.sequentialMode;
-            }
-        }
-        loadFavorites();
-    }
-	
-  // ============ VIEW MODE FUNCTIONS ============
-    function setViewMode(mode) {
-        viewMode = mode;
-        document.getElementById('gridViewBtn').classList.toggle('active', mode === 'grid');
-        document.getElementById('listViewBtn').classList.toggle('active', mode === 'list');
-        saveSettings();
-        refreshGalleryView();
-    }
-
-    function refreshGalleryView() {
-        const grid = document.querySelector('.grid');
-        if (viewMode === 'list') {
-            grid.classList.add('list-view');
-            grid.classList.remove('masonry-grid');
-            if (masonry) {
-                masonry.destroy();
-                masonry = null;
-            }
-        } else {
-            grid.classList.remove('list-view');
-            grid.classList.add('masonry-grid');
-        }
-        filterGalleryByFolder(false);
-    }
-	    // ============ MULTI-SELECT FUNCTIONS ============
-    function toggleMultiSelect() {
-        multiSelectMode = document.getElementById('multiSelectToggle').checked;
-        const grid = document.querySelector('.grid');
-        if (multiSelectMode) {
-            grid.classList.add('multi-select-mode');
-        } else {
-            grid.classList.remove('multi-select-mode');
-            selectedFiles.clear();
-        }
-        updateSelectedCount();
-    }
-
-    function toggleFileSelection(fileName, checkbox) {
-        const gridItem = checkbox.closest('.grid-item');
-        if (checkbox.checked) {
-            selectedFiles.add(fileName);
-            if (gridItem) gridItem.classList.add('selected');
-        } else {
-            selectedFiles.delete(fileName);
-            if (gridItem) gridItem.classList.remove('selected');
-        }
-        updateSelectedCount();
-    }
-
-    function updateSelectedCount() {
-        const count = selectedFiles.size;
-        document.getElementById('selectedCount').textContent = count;
-        document.getElementById('deleteBtn').style.display = count > 0 ? 'inline-block' : 'none';
-    }
-
-    function deleteSelected() {
-        if (selectedFiles.size === 0) return;
-        const confirmed = confirm(`Are you sure you want to delete ${selectedFiles.size} file(s)?\n\nThis action cannot be undone!`);
-        if (!confirmed) return;
-        
-        const deletePromises = Array.from(selectedFiles).map(fileName => {
-            return fetch('/api/delete', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ path: fileName })
-            });
-        });
-        
-        Promise.all(deletePromises)
-            .then(() => {
-                alert(`Deleted ${selectedFiles.size} file(s)`);
-                selectedFiles.clear();
-                initializeGallery();
-            })
-            .catch(err => {
-                alert('Error deleting files: ' + err.message);
-            });
-    }
-
-    function quitServer() {
-        if (!confirm('Stop the media server? You will need to restart it manually.')) return;
-        fetch('/api/quit', { method: 'POST' })
-            .then(() => {
-                document.body.innerHTML = '<div style="display:flex;justify-content:center;align-items:center;height:100vh;color:#f44336;background:#0a0a0a;font-family:sans-serif;"><h1>Server Stopped</h1></div>';
-            })
-            .catch(e => alert('Error stopping server'));
-    }
-	
-	  // ============ FAVORITES FUNCTIONS ============
-    function toggleFavorite(fileName, event) {
-        event.stopPropagation();
-        if (favoriteFiles.has(fileName)) {
-            favoriteFiles.delete(fileName);
-        } else {
-            favoriteFiles.add(fileName);
-        }
-        saveFavorites();
-        const star = event.currentTarget;
-        star.classList.toggle('is-favorite');
-        star.textContent = favoriteFiles.has(fileName) ? '★' : '☆';
-    }
-
-    function filterFavorites() {
-        const select = document.getElementById('folderFilter');
-        select.value = 'all'; 
-        
-        allMediaFiles = Array.from(favoriteFiles).filter(f => MEDIA_DATA[f]);
-        loadedMediaCount = 0;
-        const grid = document.querySelector('.grid');
-        if (masonry) {
-            masonry.destroy();
-            masonry = null;
-        }
-        grid.innerHTML = '';
-        updateFileCounter();
-        loadMoreMedia();
-    }
-	
-	  // ============ QUICK PREVIEW FUNCTIONS ============
-    function showQuickPreview(fileName) {
-        if (!quickPreviewEnabled) return;
-        clearTimeout(quickPreviewTimeout);
-        quickPreviewTimeout = setTimeout(() => {
-            const mediaInfo = MEDIA_DATA[fileName];
-            if (!mediaInfo) return;
-            
-            let overlay = document.getElementById('quickPreviewOverlay');
-            if (!overlay) {
-                overlay = document.createElement('div');
-                overlay.id = 'quickPreviewOverlay';
-                overlay.className = 'quick-preview-overlay';
-                document.body.appendChild(overlay);
-            }
-            
-            const mediaEl = mediaInfo.isVideo 
-                ? `<video src="${mediaInfo.url}" autoplay muted loop style="max-width: 100%; max-height: 60vh;"></video>`
-                : `<img src="${mediaInfo.url}" style="max-width: 100%; max-height: 60vh;">`;
-            
-            overlay.innerHTML = `
-                ${mediaEl}
-                <div class="quick-preview-info">
-                    <strong>${mediaInfo.name}</strong><br>
-                    <span style="color: #888;">${getFileExtension(mediaInfo.name)}</span>
-                </div>
-            `;
-            overlay.style.display = 'block';
-        }, 300);
-    }
-
-    function hideQuickPreview() {
-        clearTimeout(quickPreviewTimeout);
-        const overlay = document.getElementById('quickPreviewOverlay');
-        if (overlay) {
-            overlay.style.display = 'none';
-            overlay.innerHTML = '';
-        }
-    }
-	
-	 // ============ PLAYBACK MANAGEMENT FUNCTIONS ============
-    function manageVideoPlayback() {
-        const viewportItems = Array.from(document.querySelectorAll('.grid-item'));
-        const visibleItems = viewportItems.filter(item => {
-            const rect = item.getBoundingClientRect();
-            return rect.top < window.innerHeight && rect.bottom > 0;
-        });
-
-        const playables = visibleItems.map(item => {
-            const video = item.querySelector('video');
-            const webp = item.querySelector('img[src$=".webp"]');
-            return { item, video, webp };
-        }).filter(obj => obj.video || obj.webp);
-
-        const activeSet = new Set();
-        
-        if (hoveredMedia) {
-            const hoveredObj = playables.find(p => p.item === hoveredMedia);
-            if (hoveredObj) activeSet.add(hoveredObj);
-        }
-
-        const others = playables.filter(p => !activeSet.has(p));
-        for (let i = others.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [others[i], others[j]] = [others[j], others[i]];
-        }
-
-        for (const obj of others) {
-            if (activeSet.size >= videoPlayLimit) break;
-            activeSet.add(obj);
-        }
-
-        playables.forEach(obj => {
-            const shouldPlay = activeSet.has(obj);
-            
-            if (obj.video) {
-                if (shouldPlay) {
-                    if (obj.video.paused) obj.video.play().catch(() => {});
-                } else {
-                    obj.video.pause();
-                }
-            }
-            
-            if (obj.webp) {
-                const originalSrc = obj.webp.dataset.src || obj.webp.src;
-                if (!obj.webp.dataset.src) obj.webp.dataset.src = originalSrc;
-
-               if (shouldPlay && obj.webp) {
-                   if (!obj.webp.getAttribute('src')) obj.webp.src = originalSrc;
-                } else {
-                    // Optional: clear src to stop animation/save memory
-                    // if (obj.webp) obj.webp.removeAttribute('src'); 
-                }
-            }
-        });
-    }
-
-    function initAnimObserver() {
-        if (animObserver) return;
-        
-        animObserver = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                const img = entry.target;
-                if (entry.isIntersecting) {
-                    if (img.dataset.src) {
-                        img.src = img.dataset.src;
-                    }
-                } else {
-                    if (img.src && img.dataset.src) {
-                        img.style.height = img.offsetHeight + 'px'; 
-                        img.src = ''; 
-                    }
-                }
-            });
-        }, { rootMargin: '200px' });
-    }
-	
-	  // ============ GENERAL UI FUNCTIONS ============
-    function openExplorerAndShowPath() {
-        openExplorer();
-    }
-
-    function toggleQuickPreview() {
-        quickPreviewEnabled = document.getElementById('quickPreviewToggle').checked;
-        saveSettings();
-        if (!quickPreviewEnabled) hideQuickPreview();
-    }
-
-    function updateThumbnailSize() {
-        const newWidth = parseInt(document.getElementById('thumbnailWidth').value);
-        document.querySelectorAll('.grid-item').forEach(item => {
-            item.style.width = `${newWidth}px`;
-        });
-        if (masonry) {
-            masonry.options.columnWidth = newWidth;
-            masonry.layout();
-        }
-        saveSettings();
-    }
-
-    function scrollByAmount(amount) {
-        window.scrollBy({ top: amount, behavior: 'smooth' });
-    }
-
-    let lastScrollY = 0;
-    let scrollTimeout = null;
-    let controlsVisible = true;
-    let videoScrollTimeout;
-
-    function handleScroll() {
-        const controls = document.getElementById('topControls');
-        const currentScrollY = window.scrollY;
-        
-        clearTimeout(scrollTimeout);
-        
-        if (currentScrollY > lastScrollY && currentScrollY > 100) {
-            controls.classList.add('hidden');
-            controlsVisible = false;
-        }
-        
-        lastScrollY = currentScrollY;
-        
-        scrollTimeout = setTimeout(() => {
-            if (!controlsVisible) {
-                controls.classList.remove('hidden');
-                controlsVisible = true;
-            }
-        }, 1500);
-        
-        manageVideoPlayback();
-        
-        if ((window.innerHeight + window.scrollY) >= (document.body.offsetHeight - 500) &&
-            loadedMediaCount < allMediaFiles.length) {
-            loadMoreMedia();
-        }
-    }
-
-    window.addEventListener('scroll', () => {
-        clearTimeout(videoScrollTimeout);
-        videoScrollTimeout = setTimeout(handleScroll, 100);
-    });
-
-    document.addEventListener('mousemove', (e) => {
-        if (e.clientY < 100) {
-            document.getElementById('topControls').classList.remove('hidden');
-            controlsVisible = true;
-        }
-    });
-
-    function updateFileCounter() {
-        const total = allMediaFiles.length;
-        const loaded = Math.min(loadedMediaCount, total);
-        document.getElementById('fileCounter').textContent = `${total} files`;
-        document.getElementById('loadedCount').textContent = loaded;
-        document.getElementById('totalCount').textContent = total;
-    }
-
-    async function updateRootPathDisplay() {
-        try {
-            const response = await fetch('/api/root_dir');
-            if (response.ok) {
-                const data = await response.json();
-                currentRootPath = data.root_dir;
-                document.getElementById('folderName').textContent = currentRootPath;
-                document.getElementById('currentFolder').title = 'Current Root: ' + currentRootPath;
-            } else {
-                document.getElementById('folderName').textContent = 'Root Path Error';
-            }
-        } catch (e) {
-            console.error("Failed to fetch root directory:", e);
-            document.getElementById('folderName').textContent = 'API Error';
-        }
-    }
     
-    async function openExplorer() {
-        try {
-            const response = await fetch('/api/open_explorer');
-            if (!response.ok) alert('Failed to open folder.');
-        } catch (e) {
-            alert('Connection error.');
-        }
-    }
-	
-	  // ============ MAIN GALLERY FUNCTIONS ============
-    async function initializeGallery() {
-        const grid = document.querySelector('.grid');
-        grid.innerHTML = '<div class="loading">Loading media files</div>';
-        
-        loadSettings();
-        initAnimObserver();
-        
-        navigationHistory = [];
-        historyIndex = -1;
-        updateNavigationButtons();
-
-        await updateRootPathDisplay();
-        
-        document.getElementById('gridViewBtn').classList.toggle('active', viewMode === 'grid');
-        document.getElementById('listViewBtn').classList.toggle('active', viewMode === 'list');
-        
-        try {
- 			const response = await fetch('/api/files');
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            
-            const apiData = await response.json();
-            const fileList = apiData.files || [];
-            
-            // Sort files alphabetically to ensure deterministic order
-            fileList.sort((a, b) => a.path.localeCompare(b.path, undefined, {numeric: true, sensitivity: 'base'}));
-
-            allDirectories = apiData.directories || [];
-
-            if (fileList.length === 0 && allDirectories.length === 0) {
-                grid.innerHTML = '<div class="loading">No media files or folders found</div>';
-                return;
-            }
-            
-            FOLDER_MAP = { 'all': [] };
-            MEDIA_DATA = {};
-            
-            allDirectories.forEach(folderName => {
-                if (!FOLDER_MAP[folderName]) FOLDER_MAP[folderName] = [];
-            });
-            
-            fileList.forEach((fileInfo) => {
-                const relativePath = fileInfo.path;
-                const webUrl = '/media/' + relativePath.split('/').map(encodeURIComponent).join('/');
-                
-                MEDIA_DATA[relativePath] = {
-                    url: webUrl,
-                    name: fileInfo.name,
-                    isVideo: fileInfo.isVideo
-                };
-                FOLDER_MAP['all'].push(relativePath);
-                
-                const parts = relativePath.split('/');
-                if (parts.length > 1) {
-                    const folderName = parts.slice(0, -1).join('/');
-                    if (!FOLDER_MAP[folderName]) FOLDER_MAP[folderName] = [];
-                    FOLDER_MAP[folderName].push(relativePath);
-                }
-            });
-            
-            populateFolderFilter();
-            populateFullscreenFolderSelect();
-            filterGalleryByFolder(true);
-            
-        } catch (error) {
-            console.error('Error:', error);
-            grid.innerHTML = `<div class="loading">Error: ${error.message}</div>`;
-        }
-    }
-        
-    function populateFolderFilter() {
-        const select = document.getElementById('folderFilter');
-        const currentVal = select.value;
-        
-        select.innerHTML = '<option value="all">All Files</option>';
-        
-        Object.keys(FOLDER_MAP).sort().forEach(folderName => {
-            if (folderName === 'all') return;
-            const option = document.createElement('option');
-            option.value = folderName;
-            const depth = (folderName.match(/\//g) || []).length;
-            
-            const filesInFolder = FOLDER_MAP[folderName];
-            const viewedCount = filesInFolder.filter(f => viewedFiles.has(f)).length;
-            
-            option.textContent = '  '.repeat(depth) + folderName + ` (${viewedCount}/${filesInFolder.length} viewed)`;
-            select.appendChild(option);
-        });
-        
-        if (currentVal && FOLDER_MAP[currentVal]) {
-            select.value = currentVal;
-        }
-    }
-    
-    function populateFullscreenFolderSelect() {
-        const select = document.getElementById('fullscreenFolderSelect');
-        select.innerHTML = '<option value="">Jump to Folder...</option>';
-        
-        Object.keys(FOLDER_MAP).sort().forEach(folderName => {
-            if (folderName === 'all') return;
-            const option = document.createElement('option');
-            option.value = folderName;
-            const depth = (folderName.match(/\//g) || []).length;
-            option.textContent = '  '.repeat(depth) + folderName;
-            select.appendChild(option);
-        });
-    }
-    
-    function jumpToFolderFromFullscreen(folderName) {
-        if (!folderName) return;
-        document.getElementById('folderFilter').value = folderName;
-        closeFullscreen();
-        filterGalleryByFolder(true);
-        scrollToTop();
-    }
-	
-	 // ============ NAVIGATION FUNCTIONS ============
-    function updateNavigationButtons() {
-        document.getElementById('navBackBtn').disabled = historyIndex <= 0;
-        document.getElementById('navForwardBtn').disabled = historyIndex >= navigationHistory.length - 1;
-    }
-
-    function navigateUp() {
-        const current = document.getElementById('folderFilter').value;
-        if (current === 'all') return;
-        
-        const parts = current.split('/');
-        parts.pop();
-        const parent = parts.length === 0 ? 'all' : parts.join('/');
-        
-        document.getElementById('folderFilter').value = parent;
-        filterGalleryByFolder(true);
-    }
-
-    function navigateBack() {
-        if (historyIndex > 0) {
-            historyIndex--;
-            const folder = navigationHistory[historyIndex];
-            document.getElementById('folderFilter').value = folder;
-            filterGalleryByFolder(false);
-        }
-    }
-
-    function navigateForward() {
-        if (historyIndex < navigationHistory.length - 1) {
-            historyIndex++;
-            const folder = navigationHistory[historyIndex];
-            document.getElementById('folderFilter').value = folder;
-            filterGalleryByFolder(false);
-        }
-    }
-
-    function navigateRoot() {
-        document.getElementById('folderFilter').value = 'all';
-        filterGalleryByFolder(true);
-    }
-
-    function filterGalleryByFolder(recordHistory = true) {
-        const select = document.getElementById('folderFilter');
-        const folderName = select.value;
-        const grid = document.querySelector('.grid');
-        const shuffleEnabled = document.getElementById('shuffleToggle').checked;
-        const thumbnailWidth = document.getElementById('thumbnailWidth').value;
-        
-        const galleryDir = document.getElementById('galleryDir');
-        galleryDir.textContent = folderName === 'all' ? 'Root' : folderName;
-        
-        if (recordHistory) {
-            if (historyIndex === -1 || navigationHistory[historyIndex] !== folderName) {
-                navigationHistory = navigationHistory.slice(0, historyIndex + 1);
-                navigationHistory.push(folderName);
-                historyIndex++;
-            }
-        }
-        updateNavigationButtons();
-
-        if (masonry) {
-            masonry.destroy();
-            masonry = null;
-        }
-
-        grid.innerHTML = '';
-        
-        const currentPrefix = folderName === 'all' ? '' : folderName + '/';
-        const subfolders = allDirectories.filter(dir => {
-            if (folderName === 'all') return !dir.includes('/'); 
-            return dir.startsWith(currentPrefix) && 
-                   dir.slice(currentPrefix.length).indexOf('/') === -1 &&
-                   dir !== folderName;
-        });
-
-        if (subfolders.length > 0) {
-            const folderElements = subfolders.map(subDir => {
-                const card = document.createElement('div');
-                card.className = 'grid-item folder-card';
-                card.style.width = `${thumbnailWidth}px`;
-                
-                const displayName = subDir.split('/').pop();
-                card.innerHTML = `
-                    <div class="folder-icon">📁</div>
-                    <div class="item-name">${displayName}</div>
-                `;
-                card.onclick = () => {
-                    select.value = subDir;
-                    filterGalleryByFolder(true);
-                };
-                return card;
-            });
-            grid.append(...folderElements);
-        }
-
-        let displayList;
-        if (folderName === 'all') {
-            displayList = [...FOLDER_MAP['all']];
-        } else {
-            displayList = FOLDER_MAP['all'].filter(f => f.startsWith(folderName + '/'));
-        }
-        
-        if (shuffleEnabled) {
-            shuffleArray(displayList);
-        }
-        
-        allMediaFiles = displayList;
-        loadedMediaCount = 0;
-        updateFileCounter();
-        loadMoreMedia();
-        saveSettings();
-    }
-
-    function shuffleArray(array) {
-        const unviewed = array.filter(file => !viewedFiles.has(file));
-        const viewed = array.filter(file => viewedFiles.has(file));
-        
-        for (let i = unviewed.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [unviewed[i], unviewed[j]] = [unviewed[j], unviewed[i]];
-        }
-        
-        for (let i = viewed.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [viewed[i], viewed[j]] = [viewed[j], viewed[i]];
-        }
-        
-        array.length = 0;
-        array.push(...unviewed, ...viewed);
-    }
-
-    function forceReshuffle() {
-        filterGalleryByFolder(false);
-    }
-
-    function resetViewed() {
-        viewedFiles.clear();
-        filterGalleryByFolder(false);
-        populateFolderFilter();
-    }
-
-    function scrollToTop() {
-        const overlay = document.getElementById('fullscreenOverlay');
-        if (overlay.classList.contains('visible')) closeFullscreen();
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-    
-    function toggleShuffleInSlideshow() {
-        slideshowShuffle = !slideshowShuffle;
-        updateShuffleButtonText();
-        saveSettings();
-    }
-
-    function updateShuffleButtonText() {
-        const btn = document.getElementById('toggleShuffleBtn');
-        if (btn) {
-            btn.textContent = slideshowShuffle ? '🔀 Shuffle: ON' : '🔀 Shuffle: OFF';
-            btn.classList.toggle('active', slideshowShuffle);
-        }
-    }
-
-    function returnToRootFromFullscreen() {
-        closeFullscreen();
-        navigateRoot();
-    }
-
-    function getFileExtension(fileName) {
-        const parts = fileName.split('.');
-        return parts.length > 1 ? parts[parts.length - 1].toUpperCase() : 'FILE';
-    }
-
-    // ============ MEDIA RENDERING FUNCTIONS ============
-    function createMediaElement(fileName) {
-        const mediaInfo = MEDIA_DATA[fileName];
-        const isVideo = mediaInfo.isVideo;
-        let mediaElement;
-
-        if (isVideo) {
-            mediaElement = document.createElement('video');
-            mediaElement.autoplay = false;
-            mediaElement.muted = true;
-            mediaElement.loop = true;
-            mediaElement.preload = 'metadata';
-            mediaElement.src = mediaInfo.url;
-        } else {
-            mediaElement = document.createElement('img');
-            mediaElement.loading = 'lazy';
-            
-            if (fileName.toLowerCase().endsWith('.webp')) {
-                mediaElement.dataset.src = mediaInfo.url;
-                mediaElement.classList.add('lazy-anim');
-                if (animObserver) animObserver.observe(mediaElement);
-            } else {
-                mediaElement.src = mediaInfo.url;
-            }
-        }
-        return mediaElement;
-    }
-
-    function initializeMasonry() {
-        const grid = document.querySelector('.grid');
-        if (masonry) masonry.destroy();
-        
-        masonry = new Masonry(grid, {
-            itemSelector: '.grid-item',
-            columnWidth: parseInt(document.getElementById('thumbnailWidth').value),
-            gutter: 15,
-            fitWidth: true
-        });
-    }
-
-    function appendMediaToGrid(files) {
-        const grid = document.querySelector('.grid');
-        if (files.length === 0) {
-            if (!masonry && grid.children.length > 0 && viewMode === 'grid') initializeMasonry();
-            return;
-        }
-        
-        const thumbnailWidth = document.getElementById('thumbnailWidth').value;
-
-        const elements = files.map((fileName) => {
-            const mediaInfo = MEDIA_DATA[fileName];
-            const isFavorite = favoriteFiles.has(fileName);
-            
-            if (viewMode === 'list') {
-                const listItem = document.createElement('div');
-                listItem.className = 'list-item';
-                listItem.onclick = () => openFullscreen(fileName);
-                
-                const thumbnail = createMediaElement(fileName);
-                thumbnail.className = 'list-item-thumbnail';
-                
-                const checkbox = multiSelectMode ? `<input type="checkbox" class="grid-item-checkbox" onchange="toggleFileSelection('${fileName.replace(/'/g, "\\'")}', this)">` : '';
-                
-                listItem.innerHTML = `
-                    ${checkbox}
-                    <div class="list-item-info">
-                        <div class="list-item-name">${mediaInfo.name}</div>
-                        <div class="list-item-meta">${getFileExtension(mediaInfo.name)} • ${mediaInfo.isVideo ? 'Video' : 'Image'}</div>
-                    </div>
-                `;
-                
-                const starBtn = document.createElement('div');
-                starBtn.className = `favorite-star ${isFavorite ? 'is-favorite' : ''}`;
-                starBtn.textContent = isFavorite ? '★' : '☆';
-                starBtn.onclick = (e) => toggleFavorite(fileName, e);
-                listItem.appendChild(starBtn);
-                
-                listItem.insertBefore(thumbnail, listItem.children[multiSelectMode ? 1 : 0]);
-                return listItem;
-            } else {
-                const gridItem = document.createElement('div');
-                gridItem.classList.add('grid-item');
-                gridItem.style.width = `${thumbnailWidth}px`;
-                
-                if (selectedFiles.has(fileName)) gridItem.classList.add('selected');
-                
-                if (multiSelectMode) {
-                    const checkbox = document.createElement('input');
-                    checkbox.type = 'checkbox';
-                    checkbox.className = 'grid-item-checkbox';
-                    checkbox.checked = selectedFiles.has(fileName);
-                    checkbox.onclick = (e) => {
-                        e.stopPropagation();
-                        toggleFileSelection(fileName, e.target);
-                    };
-                    gridItem.appendChild(checkbox);
-                }
-                
-                const star = document.createElement('div');
-                star.className = `favorite-star ${isFavorite ? 'is-favorite' : ''}`;
-                star.textContent = isFavorite ? '★' : '☆';
-                star.onclick = (e) => toggleFavorite(fileName, e);
-                gridItem.appendChild(star);
-                
-                const mediaEl = createMediaElement(fileName);
-                gridItem.appendChild(mediaEl);
-                
-                const infoDiv = document.createElement('div');
-                infoDiv.className = 'item-info';
-                infoDiv.innerHTML = `
-                    <div class="item-name" title="${mediaInfo.name}">${mediaInfo.name}</div>
-                    <div class="item-type">${getFileExtension(mediaInfo.name)} • ${mediaInfo.isVideo ? 'Video' : 'Image'}</div>
-                `;
-                gridItem.appendChild(infoDiv);
-                
-                gridItem.addEventListener('click', (e) => {
-                    if (multiSelectMode) {
-                        const checkbox = gridItem.querySelector('.grid-item-checkbox');
-                        if (checkbox && e.target !== checkbox) {
-                            checkbox.checked = !checkbox.checked;
-                            toggleFileSelection(fileName, checkbox);
-                        }
-                    } else {
-                        openFullscreen(fileName);
-                    }
-                });
-                
-                gridItem.addEventListener('mouseenter', () => showQuickPreview(fileName));
-                gridItem.addEventListener('mouseleave', hideQuickPreview);
-                
-                gridItem.addEventListener('mouseenter', () => {
-                    hoveredMedia = gridItem;
-                    manageVideoPlayback();
-                });
-                gridItem.addEventListener('mouseleave', () => {
-                    hoveredMedia = null;
-                    manageVideoPlayback();
-                });
-
-                return gridItem;
-            }
-        });
-
-grid.append(...elements);
-
-            if (viewMode === 'grid') {
-                if (masonry) {
-                    masonry.appended(elements);
-                    imagesLoaded(elements, () => {
-                        masonry.layout();
-                        setTimeout(manageVideoPlayback, 200);
-                    });
-                } else {
-                    imagesLoaded(elements, () => {
-                        if(!masonry){ 
-                            initializeMasonry();
-                            setTimeout(() => masonry && masonry.layout(), 50);
-                        }
-                    });
-                }
-            }
-            
-            setTimeout(manageVideoPlayback, 500);
-            updateFileCounter();
-        }
-
-    function loadMoreMedia() {
-        const nextBatch = allMediaFiles.slice(loadedMediaCount, loadedMediaCount + filesPerLoad);
-        if (nextBatch.length > 0) {
-            appendMediaToGrid(nextBatch);
-            loadedMediaCount += nextBatch.length;
-        } else {
-            const currentFolder = document.getElementById('folderFilter').value;
-            if (currentFolder !== 'all' && !document.getElementById('nextFolderCard')) {
-                addNextFolderCard(currentFolder);
-            }
-        }
-    }
-
-    function addNextFolderCard(currentFolder) {
-        const sortedFolders = Object.keys(FOLDER_MAP).filter(k => k !== 'all').sort();
-        const currentIndex = sortedFolders.indexOf(currentFolder);
-        
-        if (currentIndex !== -1 && currentIndex < sortedFolders.length - 1) {
-            const nextFolder = sortedFolders[currentIndex + 1];
-            const grid = document.querySelector('.grid');
-            const thumbnailWidth = document.getElementById('thumbnailWidth').value;
-            
-            const card = document.createElement('div');
-            card.id = 'nextFolderCard';
-            card.className = 'grid-item folder-card next-folder-card';
-            card.style.width = `${thumbnailWidth}px`;
-            card.innerHTML = `
-                <div class="folder-icon">➡️</div>
-                <div class="item-name">Next: ${nextFolder.split('/').pop()}</div>
-            `;
-            
-            card.onclick = () => {
-                document.getElementById('folderFilter').value = nextFolder;
-                filterGalleryByFolder(true);
-                scrollToTop();
-            };
-            
-            grid.appendChild(card);
-            if (masonry) masonry.appended([card]);
-        }
-    }
-	
-	    // ============ FULLSCREEN FUNCTIONS ============
-     function openFullscreen(fileName) {
-        if (overlayTransitioning) return; // Block accidental re-triggers
-        overlayTransitioning = true;
-        setTimeout(() => { overlayTransitioning = false; }, 100); // Release lock after animation
-
-        const overlay = document.getElementById('fullscreenOverlay');
-        const content = document.querySelector('.fullscreen-content');
-        
-        currentMediaIndex = allMediaFiles.indexOf(fileName);
-        if (currentMediaIndex === -1) return;
-        
-        viewedFiles.add(fileName);
-        populateFolderFilter();
-        
-        const mediaInfo = MEDIA_DATA[fileName];
-        const isVideo = mediaInfo.isVideo;
-        content.innerHTML = '';
-
-        let mediaElement;
-        if (isVideo) {
-            mediaElement = document.createElement('video');
-            mediaElement.controls = true;
-            mediaElement.autoplay = true;
-            mediaElement.muted = false;
-            mediaElement.loop = false;
-            mediaElement.preload = 'auto';
-            
-            mediaElement.addEventListener('keydown', (e) => {
-                if (['ArrowLeft', 'ArrowRight', 'a', 'd'].includes(e.key)) {
-                    e.preventDefault();
-                    if (e.key === 'ArrowRight' || e.key === 'd') navigateFullscreen(1);
-                    if (e.key === 'ArrowLeft' || e.key === 'a') navigateFullscreen(-1);
-                }
-            });
-        } else {
-            mediaElement = document.createElement('img');
-        }
-
-        mediaElement.src = mediaInfo.url;
-        content.appendChild(mediaElement);
-        
-        updateProgressBar();
-
-        updateFullscreenInfo(fileName);
-        
-        const dirParts = fileName.split('/');
-        const dirPath = dirParts.length > 1 ? dirParts.slice(0, -1).join('/') : 'Root';
-        document.getElementById('fullscreenDir').textContent = dirPath;
-        
-        if (!isPlaying) {
-             const fsSelect = document.getElementById('fullscreenFolderSelect');
-             if (FOLDER_MAP[dirPath]) {
-                 fsSelect.value = dirPath;
-             } else {
-                 fsSelect.value = "";
-             }
-        }
-
-        updateShuffleButtonText();
-        overlay.classList.add('visible');
-        resetControlsTimer();
-    }
-
-    function updateFullscreenInfo(fileName) {
-        const mediaInfo = MEDIA_DATA[fileName];
-        const infoDiv = document.getElementById('mediaInfo');
-        
-        infoDiv.querySelector('.media-counter').textContent = `${currentMediaIndex + 1} / ${allMediaFiles.length}`;
-        infoDiv.querySelector('.media-filename').textContent = mediaInfo.name;
-        infoDiv.querySelector('.media-filetype').textContent = `${getFileExtension(mediaInfo.name)} • ${mediaInfo.isVideo ? 'Video' : 'Image'}`;
-        
-        document.getElementById('prevBtn').disabled = currentMediaIndex <= 0;
-        document.getElementById('nextBtn').disabled = currentMediaIndex >= allMediaFiles.length - 1;
-    }
-
-    function toggleSequentialMode() {
-        sequentialMode = !sequentialMode;
-        document.getElementById('modeText').textContent = sequentialMode ? 'Sequential' : 'Random';
-        document.getElementById('sequentialModeBtn').classList.toggle('active');
-        saveSettings();
-    }
-
-    function navigateFullscreen(direction, forceSequential = false) {
-        // Always follow the current list order (which is sorted or shuffled based on the checkbox)
-        let newIndex = currentMediaIndex + direction;
-        
-        if (newIndex >= 0 && newIndex < allMediaFiles.length) {
-            currentMediaIndex = newIndex;
-            openFullscreen(allMediaFiles[currentMediaIndex]);
-        } else if (newIndex >= allMediaFiles.length) {
-            stopAutoAdvance();
-        }
-    }
-
-    function updateProgressBar() {
-        const progressBar = document.getElementById('verticalProgress');
-        const progressFill = document.getElementById('progressFill');
-        
-        progressBar.style.display = 'block';
-        const progressPercent = ((currentMediaIndex + 1) / allMediaFiles.length) * 100;
-        progressFill.style.height = progressPercent + '%';
-    }
-    
-    function jumpToProgress(e) {
-        e.stopPropagation();
-        const progressBar = document.getElementById('verticalProgress');
-        const rect = progressBar.getBoundingClientRect();
-        const clickY = e.clientY - rect.top;
-        const height = rect.height;
-        const percentage = clickY / height;
-        
-        let newIndex = Math.floor(percentage * allMediaFiles.length);
-        newIndex = Math.max(0, Math.min(newIndex, allMediaFiles.length - 1));
-        
-        openFullscreen(allMediaFiles[newIndex]);
-    }
-
-    function closeFullscreen() {
-        document.getElementById('fullscreenOverlay').classList.remove('visible');
-        stopAutoAdvance();
-        currentMediaIndex = -1;
-        const content = document.querySelector('.fullscreen-content');
-        content.innerHTML = ''; 
-    }
-
-    function resetControlsTimer() {
-        const controls = document.getElementById('playbackControls');
-        controls.classList.remove('auto-hide');
-        clearTimeout(controlsHideTimer);
-        controlsHideTimer = setTimeout(() => {
-            if (isPlaying) controls.classList.add('auto-hide');
-        }, 3000);
-    }
-
-    function startAutoAdvance() {
-        stopAutoAdvance();
-        let delay = parseInt(document.getElementById('advanceTime').value);
-        if (isNaN(delay) || delay < 500) {
-            delay = 500;
-            document.getElementById('advanceTime').value = 500;
-        }
-
-        autoAdvanceInterval = setInterval(() => {
-            if (currentMediaIndex < allMediaFiles.length - 1) {
-                navigateFullscreen(1);
-                updateProgressBar();
-            } else {
-                stopAutoAdvance();
-            }
-        }, delay);
-        isPlaying = true;
-        document.getElementById('playPauseBtn').textContent = '⏸ Pause';
-        document.getElementById('playPauseBtn').classList.add('active');
-        updateProgressBar();
-    }
-
-    function stopAutoAdvance() {
-        if (autoAdvanceInterval) {
-            clearInterval(autoAdvanceInterval);
-            autoAdvanceInterval = null;
-        }
-        isPlaying = false;
-        document.getElementById('playPauseBtn').textContent = '▶ Play';
-        document.getElementById('playPauseBtn').classList.remove('active');
-    }
-
-    function seekVideo(seconds) {
-        const video = document.querySelector('.fullscreen-content video');
-        if (video) {
-            video.currentTime += seconds;
-        }
-	}
-		
-		   // ============ EVENT LISTENERS ============
-    document.getElementById('thumbnailWidth').addEventListener('input', (e) => {
-        const newWidth = parseInt(e.target.value);
-        document.querySelectorAll('.grid-item').forEach(item => {
-            item.style.width = `${newWidth}px`;
-        });
-        if (masonry) {
-            masonry.options.columnWidth = newWidth;
-            masonry.layout();
-        }
-    });
-
-    document.querySelector('.close-btn').addEventListener('click', closeFullscreen);
-    document.getElementById('prevBtn').addEventListener('click', () => navigateFullscreen(-1));
-    document.getElementById('nextBtn').addEventListener('click', () => navigateFullscreen(1));
-    document.getElementById('playPauseBtn').addEventListener('click', () => {
-        isPlaying ? stopAutoAdvance() : startAutoAdvance();
-    });
-
-    document.addEventListener('keydown', (e) => {
-        const overlay = document.getElementById('fullscreenOverlay');
-        if (!overlay.classList.contains('visible')) return;
-        
-        if (e.key === 'ArrowRight' || e.key === 'd') navigateFullscreen(1);
-        else if (e.key === 'ArrowLeft' || e.key === 'a') navigateFullscreen(-1);
-        else if (e.key === 'Escape') closeFullscreen();
-        else if (e.key === ' ') {
-            e.preventDefault();
-            isPlaying ? stopAutoAdvance() : startAutoAdvance();
-        }
-    });
-
-      document.getElementById('fullscreenOverlay').addEventListener('mousedown', (e) => {
-        if (overlayTransitioning) return; // Ignore clicks during open animation
-        
-        
-        if (e.button === 1) {
-            e.preventDefault();
-            closeFullscreen();
-            return;
-        }
-        if (e.target.closest('.close-btn, .playback-controls, .nav-btn, .bottom-right-root, .top-left-close, .fullscreen-folder-select, .vertical-progress-bar')) return;
-        if (e.target.tagName === 'VIDEO') return;
-        e.preventDefault();
-        if (e.button === 0 && currentMediaIndex < allMediaFiles.length - 1) {
-            navigateFullscreen(1);
-        }
-    });
-
-    document.getElementById('fullscreenOverlay').addEventListener('contextmenu', (e) => {
-        if (e.target.tagName === 'VIDEO') return;
-        e.preventDefault();
-        if (isPlaying) {
-            stopAutoAdvance();
-        } else {
-            if (currentMediaIndex > 0) navigateFullscreen(-1, true);
-        }
-    });
-    
-    document.getElementById('fullscreenOverlay').addEventListener('wheel', (e) => {
-        e.preventDefault();
-        if (e.deltaY > 0) navigateFullscreen(1, true);
-        else if (e.deltaY < 0) navigateFullscreen(-1, true);
-    });
-
-    document.getElementById('fullscreenOverlay').addEventListener('mousemove', resetControlsTimer);
-
-    // ============ INITIALIZATION ============
-    window.addEventListener('DOMContentLoaded', initializeGallery);
-
-	</script>
+    <!-- ============ SCRIPTS ============ -->
+    <script src="main.js"></script>
+    <script src="settings.js"></script>
+    <script src="media.js"></script>
+    <script src="gallery.js"></script>
+    <script src="ui.js"></script>
+    <script src="fullscreen.js"></script>
+    <script src="mode.js"></script>
+    <script src="handlers.js"></script>
 </body>
 </html>
