@@ -202,7 +202,8 @@ func setupRoutes(mediaDir string) {
 	// API endpoint for file list (with details)
 	http.HandleFunc("/api/files", func(w http.ResponseWriter, r *http.Request) {
 		updateActivity()
-		files, directories, err := getDetailedFileListAndFolders(mediaDir)
+		source := r.URL.Query().Get("source") // Get requested source
+		files, directories, err := getDetailedFileListAndFolders(mediaDir, source)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -216,8 +217,21 @@ func setupRoutes(mediaDir string) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(response)
 	})
+
+	// API to list available data sources (JSON files)
+	http.HandleFunc("/api/sources", func(w http.ResponseWriter, r *http.Request) {
+		updateActivity()
+		matches, _ := filepath.Glob(filepath.Join(mediaDir, "*.json"))
+		var sources []string
+		for _, m := range matches {
+			sources = append(sources, filepath.Base(m))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(sources)
+	})
 	
-	http.HandleFunc("/api/root_dir", func(w http.ResponseWriter, r *http.Request) {
+	
+		http.HandleFunc("/api/root_dir", func(w http.ResponseWriter, r *http.Request) {
 		updateActivity()
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{
@@ -256,8 +270,22 @@ http.HandleFunc("/api/quit", func(w http.ResponseWriter, r *http.Request) {
     })
 }
 
-func getDetailedFileListAndFolders(dir string) ([]FileInfo, []string, error) {
-    extensions := map[string]bool{
+func getDetailedFileListAndFolders(dir, source string) ([]FileInfo, []string, error) {
+	// 1. If a specific JSON source is requested (and not "disk"), try to load it
+	if source != "" && source != "disk" {
+		manifestPath := filepath.Join(dir, source)
+		if _, err := os.Stat(manifestPath); err == nil {
+			log.Printf("Loading requested manifest: %s", source)
+			return loadFromManifest(dir, manifestPath)
+		}
+	}
+
+	// 2. Fallback/Default: Walk directory (Disk Scan)
+	log.Println("Scanning directory structure...")
+	extensions := map[string]bool{
+		".jpg": false, ".jpeg": false, ".png": false, ".webp": false,
+		".gif": false, ".mp4": true, ".webm": true, ".ogg": true,
+		".bmp": false, ".svg": false, ".mov": true, ".avi": true,
         ".jpg": false, ".jpeg": false, ".png": false, ".webp": false,
         ".gif": false, ".mp4": true, ".webm": true, ".ogg": true,
         ".bmp": false, ".svg": false, ".mov": true, ".avi": true,
@@ -307,6 +335,27 @@ func getDetailedFileListAndFolders(dir string) ([]FileInfo, []string, error) {
 
     return files, directories, err
 }
+
+// loadFromManifest reads a pre-generated JSON manifest and returns the same structure expected by the API
+func loadFromManifest(baseDir, manifestPath string) ([]FileInfo, []string, error) {
+	data, err := os.ReadFile(manifestPath)
+	if err != nil {
+		return nil, nil, err
+	}
+	var resp ApiResponse
+	if err := json.Unmarshal(data, &resp); err != nil {
+		return nil, nil, err
+	}
+	// Ensure paths are correct relative to the media directory
+	for i := range resp.Files {
+		resp.Files[i].Path = filepath.ToSlash(resp.Files[i].Path)
+	}
+	for i := range resp.Directories {
+		resp.Directories[i] = filepath.ToSlash(resp.Directories[i])
+	}
+	return resp.Files, resp.Directories, nil
+}
+
 
 func generateOrLoadCertificate() (tls.Certificate, error) {
 	certFile := filepath.Join(os.TempDir(), "mediagallery_cert.pem")
