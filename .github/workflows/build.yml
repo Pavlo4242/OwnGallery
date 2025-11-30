@@ -176,10 +176,10 @@ jobs:
 
       - name: Print Short SHA
         # This uses bash string slicing to get the first 7 characters
-        run: echo "Short SHA: ${GITHUB_SHA::7}"
+        run: echo "Short SHA:${GITHUB_SHA::7}"
         
       - name: Print Run number
-        run: echo "This is build number: $GITHUB_RUN_NUMBER"
+        run: echo "This is build number:$GITHUB_RUN_NUMBER"
 
 
   release:
