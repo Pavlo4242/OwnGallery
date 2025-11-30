@@ -806,6 +806,13 @@
                 <button class="view-mode-btn" id="listViewBtn" onclick="setViewMode('list')" title="List View">☰</button>
             </div>
             
+                            <button class="view-mode-btn" id="listViewBtn" onclick="setViewMode('list')" title="List View">☰</button>
+            </div>
+
+            <select id="sourceSelect" onchange="initializeGallery()" style="max-width: 150px;">
+                <option value="disk">📂 Disk Scan</option>
+            </select>
+            
             <button onclick="initializeGallery()">🔄 Reload</button>
             
             <label>
@@ -869,6 +876,8 @@
             <div class="media-filename"></div>
             <div class="media-filetype"></div>
         </div>
+
+		
 		
 		   <!-- ============ PLAYBACK CONTROLS ============ -->
         <div class="playback-controls" id="playbackControls">
@@ -1355,7 +1364,29 @@
 	
 	  // ============ MAIN GALLERY FUNCTIONS ============
     async function initializeGallery() {
-        const grid = document.querySelector('.grid');
+      const grid = document.querySelector('.grid');
+        const sourceSelect = document.getElementById('sourceSelect');
+        const currentSource = sourceSelect.value;
+        
+        // 1. Fetch available sources (only on first load or if empty)
+        if (sourceSelect.options.length <= 1) {
+            try {
+                const srcRes = await fetch('/api/sources');
+                if (srcRes.ok) {
+                    const sources = await srcRes.json();
+                    sources.forEach(src => {
+                        // Prevent duplicates
+                        if (![...sourceSelect.options].some(o => o.value === src)) {
+                            const opt = document.createElement('option');
+                            opt.value = src;
+                            opt.textContent = '📄 ' + src;
+                            sourceSelect.appendChild(opt);
+                        }
+                    });
+                }
+            } catch (e) { console.error("Could not fetch sources", e); }
+        }
+
         grid.innerHTML = '<div class="loading">Loading media files</div>';
         
         loadSettings();
@@ -1371,7 +1402,8 @@
         document.getElementById('listViewBtn').classList.toggle('active', viewMode === 'list');
         
         try {
- 			const response = await fetch('/api/files');
+            // Pass the selected source to the API
+ 			const response = await fetch(`/api/files?source=${encodeURIComponent(currentSource)}`);
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             
             const apiData = await response.json();
