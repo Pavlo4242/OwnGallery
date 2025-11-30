@@ -622,5 +622,3 @@ func findEdge() string {
 	}
 	return ""
 }
-
-e
