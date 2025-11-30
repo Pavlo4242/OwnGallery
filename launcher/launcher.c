@@ -1,4 +1,5 @@
 #include <windows.h>
+#include <rpc.h> // Required for UuidCreate function prototype
 #include <stdio.h>
 #include <stdlib.h>
 #include <shlwapi.h>
