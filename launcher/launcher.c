@@ -84,25 +84,77 @@ void GetCurrentDir(char* buffer, size_t size) {
 }
 
 void LaunchBrowser(const char* url) {
-    Sleep(4000);
-    char cmd[BUFFER_SIZE];
-    snprintf(cmd, sizeof(cmd), 
-        "\"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe\" --ignore-certificate-errors \"%s\"", url);
+    Sleep(3500);  // Increased delay for server initialization
+
+    if (showConsole) {
+        printf("Launching Chrome...\n");
+        fflush(stdout);
+    }
+
+    // Direct Chrome launch with error handling
+    char chromePath[MAX_PATH] = "chrome.exe";
+    char cmdLine[BUFFER_SIZE];
+    snprintf(cmdLine, sizeof(cmdLine), "\"%s\" --new-window \"%s\"", chromePath, url);
     
-    STARTUPINFO si = {sizeof(si)};
+    STARTUPINFO si = { sizeof(si) };
     PROCESS_INFORMATION pi;
     
-    if (!CreateProcess(NULL, cmd, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
-        snprintf(cmd, sizeof(cmd), 
-            "\"C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe\" --ignore-certificate-errors \"%s\"", url);
+    BOOL success = CreateProcessA(NULL, cmdLine, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi);
+    
+    if (success) {
+        CloseHandle(pi.hThread);
+        CloseHandle(pi.hProcess);
         
-        if (!CreateProcess(NULL, cmd, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
-            ShellExecute(NULL, "open", url, NULL, NULL, SW_SHOWNORMAL);
-            return;
+        if (showConsole) {
+            printf("Chrome launched successfully!\n");
+            fflush(stdout);
+        }
+    } else {
+        // Chrome not in PATH, try common locations
+        char* commonPaths[] = {
+            "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+            "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+            NULL
+        };
+        
+        BOOL found = FALSE;
+        for (int i = 0; commonPaths[i] != NULL; i++) {
+            if (PathFileExists(commonPaths[i])) {
+                snprintf(cmdLine, sizeof(cmdLine), "\"%s\" --new-window \"%s\"", commonPaths[i], url);
+                
+                if (CreateProcessA(NULL, cmdLine, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
+                    CloseHandle(pi.hThread);
+                    CloseHandle(pi.hProcess);
+                    found = TRUE;
+                    
+                    if (showConsole) {
+                        printf("Chrome launched from: %s\n", commonPaths[i]);
+                        fflush(stdout);
+                    }
+                    break;
+                }
+            }
+        }
+        
+        if (!found) {
+            // Final fallback to default browser
+            if (showConsole) {
+                printf("Chrome not found, using default browser...\n");
+                fflush(stdout);
+            }
+            
+            HINSTANCE result = ShellExecuteA(NULL, "open", url, NULL, NULL, SW_SHOWNORMAL);
+            
+            if ((intptr_t)result <= 32) {
+                char msg[512];
+                snprintf(msg, sizeof(msg),
+                    "Chrome not found and could not open default browser.\n\n"
+                    "Please install Chrome or open this URL manually:\n"
+                    "%s", url);
+                MessageBoxA(NULL, msg, "Media Browser", MB_ICONINFORMATION | MB_OK);
+            }
         }
     }
-    CloseHandle(pi.hProcess);
-    CloseHandle(pi.hThread);
 }
 
 void TerminateServerProcess(HANDLE hProcess, DWORD processId) {
