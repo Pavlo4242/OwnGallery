@@ -20,7 +20,7 @@
 #define ID_TRAY_CHANGE_FOLDER 1002
 #define ID_TRAY_OPEN_BROWSER 1003
 
-const char CLASS_NAME[] = "MediaGalleryLauncherWindow";
+const char CLASS_NAME[] = "MediaBrowserLauncherWindow";
 
 // Global Handles
 PROCESS_INFORMATION serverProcessInfo;
@@ -180,20 +180,20 @@ void ShowHelp() {
     const char* helpText = 
         "\n"
         "═══════════════════════════════════════════════════════\n"
-        "           Media Gallery Launcher - Help\n"
+        "           Media Browser Launcher - Help\n"
         "═══════════════════════════════════════════════════════\n\n"
-        "USAGE: MediaGallery.exe [OPTIONS] [DIRECTORY] [PORT]\n\n"
+        "USAGE: MediaBrowser.exe [OPTIONS] [DIRECTORY] [PORT]\n\n"
         "OPTIONS:\n"
         "  /help, -help, /?     Show this help message\n"
         "  /w, -w               Show console window (debug mode)\n"
         "  /d <path>            Specify media directory\n"
         "  /p <port>            Specify port (default: 8987)\n\n"
         "EXAMPLES:\n"
-        "  MediaGallery.exe\n"
-        "  MediaGallery.exe /w\n"
-        "  MediaGallery.exe \"C:\\Photos\"\n"
-        "  MediaGallery.exe /d \"D:\\Videos\" /p 9000\n"
-        "  MediaGallery.exe /w \"C:\\Media\" 8080\n\n"
+        "  MediaBrowser.exe\n"
+        "  MediaBrowser.exe /w\n"
+        "  MediaBrowser.exe \"C:\\Photos\"\n"
+        "  MediaBrowser.exe /d \"D:\\Videos\" /p 9000\n"
+        "  MediaBrowser.exe /w \"C:\\Media\" 8080\n\n"
         "TRAY ICON:\n"
         "  Double-click:  Open in browser\n"
         "  Right-click:   Menu (change folder, exit)\n\n"
@@ -210,7 +210,7 @@ void ShowHelp() {
         getchar();
     } else {
         // GUI mode - show message box
-        MessageBox(NULL, helpText, "Media Gallery - Help", MB_ICONINFORMATION | MB_OK);
+        MessageBox(NULL, helpText, "Media Browser - Help", MB_ICONINFORMATION | MB_OK);
     }
 }
 
@@ -226,7 +226,7 @@ void UpdateTrayTooltip(const char* dir) {
     }
     shortDir[sizeof(shortDir) - 1] = '\0';
     
-    snprintf(tooltip, sizeof(tooltip), "Media Gallery - %s", shortDir);
+    snprintf(tooltip, sizeof(tooltip), "Media Browser - %s", shortDir);
     strcpy(nid.szTip, tooltip);
     Shell_NotifyIcon(NIM_MODIFY, &nid);
 }
@@ -344,7 +344,7 @@ HWND CreateHostWindow(HINSTANCE hInstance) {
     RegisterClass(&wc);
     
     return CreateWindowEx(
-        0, CLASS_NAME, "Media Gallery Host", 0,
+        0, CLASS_NAME, "Media Browser Host", 0,
         0, 0, 0, 0,
         HWND_MESSAGE, NULL, hInstance, NULL
     );
@@ -434,7 +434,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     
     GetTempPath(sizeof(tempExePath), tempExePath);
     snprintf(tempExePath + strlen(tempExePath), sizeof(tempExePath) - strlen(tempExePath), 
-             "MediaGallery_%d\\", GetCurrentProcessId());
+             "MediaBrowser_%d\\", GetCurrentProcessId());
     CreateDirectory(tempExePath, NULL);
     
     snprintf(serverExePath, sizeof(serverExePath), "%sserver.exe", tempExePath);
