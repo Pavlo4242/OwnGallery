@@ -94,7 +94,7 @@ void LaunchBrowser(const char* url) {
     // Direct Chrome launch with error handling
     char chromePath[MAX_PATH] = "chrome.exe";
     char cmdLine[BUFFER_SIZE];
-    snprintf(cmdLine, sizeof(cmdLine), "\"%s\" --new-window \"%s\"", chromePath, url);
+    snprintf(cmdLine, sizeof(cmdLine), "\"%s\" --new-window --ignore-certificate-errors --ignore-ssl-errors --allow-insecure-localhost \"%s\"", chromePath, url);
     
     STARTUPINFO si = { sizeof(si) };
     PROCESS_INFORMATION pi;
