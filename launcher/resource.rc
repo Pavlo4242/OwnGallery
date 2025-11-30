@@ -4,7 +4,7 @@
 101 ICON "gallery_icon.ico"
 
 // Embed the server binary
-1 RCDATA "../server/server.exe"
+1 RCDATA "../server/server.bin"
 
 // Version info
 1 VERSIONINFO
