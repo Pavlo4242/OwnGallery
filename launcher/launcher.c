@@ -103,17 +103,13 @@ void TerminateServerProcess(HANDLE hProcess, DWORD processId) {
 
     DWORD exitCode;
     if (GetExitCodeProcess(hProcess, &exitCode) && exitCode == STILL_ACTIVE) {
-        // Graceful: send Ctrl+C to the entire process group
-        GenerateConsoleCtrlEvent(CTRL_C_EVENT, 0);
+        GenerateConsoleCtrlEvent(CTRL_C_EVENT, processId);  // Target our group only
 
-        // Wait up to 5 seconds for clean shutdown
         if (WaitForSingleObject(hProcess, 5000) == WAIT_TIMEOUT) {
-            // Force kill if it didn't exit
             TerminateProcess(hProcess, 1);
         }
     }
 
-    // Final cleanup
     WaitForSingleObject(hProcess, INFINITE);
     CloseHandle(hProcess);
 }
@@ -142,7 +138,7 @@ void CleanupWithRetries(const char* serverPath, const char* tempPath) {
 
 BOOL StartServer(const char* mediaDir, const char* port) {
     if (hServerProcess) {
-        TerminateServerProcess(hServerProcess, serverProcessInfo.dwProcessInfo.dwProcessId);
+        TerminateServerProcess(hServerProcess, serverProcessInfo.dwProcessId);
         CloseHandle(hServerProcess);
         CloseHandle(serverProcessInfo.hThread);
         hServerProcess = NULL;
