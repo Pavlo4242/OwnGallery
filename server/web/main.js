@@ -1,6 +1,4 @@
-Restores: Wiring up the listeners for Delete, View Mode, and History buttons.*
 
-```javascript
 app.main = {
     async init() {
         const grid = document.querySelector('.grid');
@@ -76,6 +74,15 @@ app.main = {
              app.utils.saveSettings();
         });
 
+        // The HTML is assumed to have a quickPreviewToggle checkbox
+        const btnQuickPreview = document.getElementById('quickPreviewToggle');
+        if (btnQuickPreview) btnQuickPreview.onchange = (e) => app.utils.toggleQuickPreview(e.target.checked);
+        
+        // The HTML is assumed to have a filterFavorites button
+        const btnFavorites = document.getElementById('filterFavoritesBtn');
+        if (btnFavorites) btnFavorites.onclick = () => app.utils.filterFavorites();
+
+        
         // Button Listeners (if present in HTML)
         const btnDelete = document.getElementById('deleteBtn');
         if (btnDelete) btnDelete.onclick = () => app.utils.deleteSelected();
