@@ -84,19 +84,25 @@ void GetCurrentDir(char* buffer, size_t size) {
 }
 
 void LaunchBrowser(const char* url) {
-    Sleep(2800);  // Give server time to bind HTTPS
-
-    // This is the ONLY reliable way on Windows
-    HINSTANCE result = ShellExecuteA(NULL, "open", url, NULL, NULL, SW_SHOWNORMAL);
-
-    // ShellExecute returns >32 on success, <=32 on error
-    if ((intptr_t)result <= 32) {
-        MessageBoxA(NULL,
-            "Could not open your default browser automatically.\n\n"
-            "Please open this URL manually:\n"
-            "https://localhost:8987",
-            "Media Browser", MB_ICONINFORMATION | MB_OK);
+    Sleep(4000);
+    char cmd[BUFFER_SIZE];
+    snprintf(cmd, sizeof(cmd), 
+        "\"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe\" --ignore-certificate-errors \"%s\"", url);
+    
+    STARTUPINFO si = {sizeof(si)};
+    PROCESS_INFORMATION pi;
+    
+    if (!CreateProcess(NULL, cmd, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
+        snprintf(cmd, sizeof(cmd), 
+            "\"C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe\" --ignore-certificate-errors \"%s\"", url);
+        
+        if (!CreateProcess(NULL, cmd, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
+            ShellExecute(NULL, "open", url, NULL, NULL, SW_SHOWNORMAL);
+            return;
+        }
     }
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
 }
 
 void TerminateServerProcess(HANDLE hProcess, DWORD processId) {
