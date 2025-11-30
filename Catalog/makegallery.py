@@ -1,3 +1,4 @@
+
 import http.server
 import socketserver
 import os
@@ -7,6 +8,10 @@ import urllib.parse
 # CONFIGURATION
 PORT = 8000
 DIRECTORY = os.getcwd()
+THUMBNAILS_DIR = os.path.join(DIRECTORY, 'thumbnails')
+
+
+
 
 class MediaGalleryHandler(http.server.SimpleHTTPRequestHandler):
     def do_POST(self):
@@ -83,21 +88,23 @@ class MediaGalleryHandler(http.server.SimpleHTTPRequestHandler):
             video_exts = {'.mp4', '.webm', '.mov', '.mkv'}
             all_exts = valid_exts.union(video_exts)
             
-            # Walk through all folders
-            for root, dirs, files in os.walk(DIRECTORY):
-                for f in files:
-                    ext = os.path.splitext(f)[1].lower()
-                    if ext in all_exts:
-                        # Get relative path (e.g. "Subfolder/image.jpg")
-                        full_path = os.path.join(root, f)
-                        rel_path = os.path.relpath(full_path, DIRECTORY).replace('\\', '/')
-                        
-                        # Add to list
-                        file_list.append({
-                            'path': rel_path,
-                            'name': f,
-                            'isVideo': ext in video_exts
-                        })
+            # Only scan the thumbnails directory if it exists
+            if os.path.exists(THUMBNAILS_DIR) and os.path.isdir(THUMBNAILS_DIR):
+                # Walk through only the thumbnails folder
+                for root, dirs, files in os.walk(THUMBNAILS_DIR):
+                    for f in files:
+                        ext = os.path.splitext(f)[1].lower()
+                        if ext in all_exts:
+                            # Get relative path from thumbnails directory
+                            full_path = os.path.join(root, f)
+                            rel_path = os.path.relpath(full_path, THUMBNAILS_DIR).replace('\\', '/')
+                            
+                            # Add to list
+                            file_list.append({
+                                'path': f'thumbnails/{rel_path}',  # Prefix with thumbnails/
+                                'name': f,
+                                'isVideo': ext in video_exts
+                            })
             
             # Send JSON back to browser
             self.wfile.write(json.dumps(file_list).encode())
