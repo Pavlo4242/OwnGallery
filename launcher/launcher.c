@@ -345,7 +345,7 @@ void ChangeFolderAndRestart() {
                 UpdateTrayTooltip(newFolder);
                 
                 char url[BUFFER_SIZE];
-                snprintf(url, sizeof(url), "https://localhost:%s", currentPort);
+                snprintf(url, sizeof(url), "http://localhost:%s", currentPort);
                 LaunchBrowser(url);
             }
         }
@@ -384,7 +384,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 DestroyMenu(hMenu);
             } else if (lParam == WM_LBUTTONDBLCLK) {
                 char url[BUFFER_SIZE];
-                snprintf(url, sizeof(url), "https://localhost:%s", currentPort);
+                snprintf(url, sizeof(url), "http://localhost:%s", currentPort);
                 LaunchBrowser(url);
             }
             break;
@@ -396,7 +396,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                     break;
                 case ID_TRAY_OPEN_BROWSER: {
                     char url[BUFFER_SIZE];
-                    snprintf(url, sizeof(url), "https://localhost:%s", currentPort);
+                    snprintf(url, sizeof(url), "http://localhost:%s", currentPort);
                     LaunchBrowser(url);
                     break;
                 }
@@ -589,7 +589,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     }
     
     char url[BUFFER_SIZE];
-    snprintf(url, sizeof(url), "https://localhost:%s", currentPort);
+    snprintf(url, sizeof(url), "http://localhost:%s", currentPort);
     LaunchBrowser(url);
     
     nid.cbSize = sizeof(nid);
