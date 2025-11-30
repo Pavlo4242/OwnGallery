@@ -975,10 +975,9 @@ transition: opacity 0.3s ease;
         let animObserver = null;
         let hoveredMedia = null;
         let overlayTransitioning = false; 
-		let autoAdvanceInterval = null;
-        let mouseDownAdvanceInterval = null;
-        let isPlaying = false;
-        let viewedFiles = new Set();
+		let mouseDownAdvanceInterval = null;
+        
+        
     
     
         // Navigation History Variables
@@ -1374,8 +1373,9 @@ transition: opacity 0.3s ease;
                 } else {
                     document.getElementById('folderName').textContent = 'Root Path Error';
                 }
-            } catch (e) {
+             } catch (e) {
                 console.error("Failed to fetch root directory:", e);
+                alert(`Error: Could not fetch the root directory path.\n\nPlease ensure the backend server is running correctly.\n\nDetails: ${e.message}`);
                 document.getElementById('folderName').textContent = 'API Error';
             }
         }
@@ -1476,8 +1476,9 @@ transition: opacity 0.3s ease;
                 populateFullscreenFolderSelect();
                 filterGalleryByFolder(true);
                 
-            } catch (error) {
+               } catch (error) {
                 console.error('Error:', error);
+                alert(`Error: Could not load media files from the server.\n\nPlease ensure the backend server is running and the source is configured.\n\nDetails: ${error.message}`);
                 grid.innerHTML = `<div class="loading">Error: ${error.message}</div>`;
             }
         }
@@ -2136,55 +2137,48 @@ transition: opacity 0.3s ease;
         });
     
   // Stops the auto-advance from holding down the mouse button.
-        function stopMouseDownAdvance() {
+function stopMouseDownAdvance() {
             if (mouseDownAdvanceInterval) {
                 clearInterval(mouseDownAdvanceInterval);
                 mouseDownAdvanceInterval = null;
             }
         }
+        document.addEventListener('mouseup', stopMouseDownAdvance);
 
         document.getElementById('fullscreenOverlay').addEventListener('mousedown', (e) => {
-            if (overlayTransitioning) return; // Ignore clicks during open animation
-            
-            if (e.button === 1) { // Middle-click to close
+            if (overlayTransitioning) return; 
+
+            if (e.button === 1) { // Middle-click close
                 e.preventDefault();
                 closeFullscreen();
                 return;
             }
 
-            // Ignore clicks on controls or the video itself
-            if (e.target.closest('.close-btn, .playback-controls, .nav-btn, .bottom-right-root, .top-left-close, .fullscreen-folder-select, .vertical-progress-bar')) return;
-            if (e.target.tagName === 'VIDEO') return;
+            // Ignore clicks on controls or the video element
+            if (e.target.closest('.close-btn, .playback-controls, .nav-btn, .bottom-right-root, .top-left-close, .fullscreen-folder-select, .vertical-progress-bar, video')) return;
 
-            // Handle left-click and hold to auto-advance
-            if (e.button === 0) {
+            if (e.button === 0) { // Left-click
                 e.preventDefault();
-                
-                // Stop any other playback modes and clear previous interval
-                stopAutoAdvance();
-                stopMouseDownAdvance();
+                stopAutoAdvance(); // Stop slideshow 'play' mode
+                stopMouseDownAdvance(); 
 
-                const advanceAction = () => {
+                const advance = () => {
                     if (currentMediaIndex < allMediaFiles.length - 1) {
                         navigateFullscreen(1);
                     } else {
-                        stopMouseDownAdvance(); // Stop at the end of the gallery
+                        stopMouseDownAdvance(); // Stop at the end
                     }
                 };
-
-                // Advance once immediately on click
-                advanceAction();
-
-                // Set an interval to keep advancing while the mouse is held down
-                let delay = parseInt(document.getElementById('advanceTime').value);
-                if (isNaN(delay) || delay < 250) delay = 250;
                 
-                mouseDownAdvanceInterval = setInterval(advanceAction, delay);
+                advance(); // Advance once immediately
+
+                let delay = parseInt(document.getElementById('advanceTime').value, 10);
+                if (isNaN(delay) || delay < 250) delay = 250;
+
+                mouseDownAdvanceInterval = setInterval(advance, delay);
             }
         });
 
-        // Add listeners to stop the advance when the mouse is released or leaves the overlay.
-        document.addEventListener('mouseup', stopMouseDownAdvance);
         document.getElementById('fullscreenOverlay').addEventListener('mouseleave', stopMouseDownAdvance);
         
             
