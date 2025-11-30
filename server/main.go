@@ -458,8 +458,8 @@ func loadFromManifest(baseDir, manifestPath string) ([]FileInfo, []string, error
 }
 
 func generateOrLoadCertificate() (tls.Certificate, error) {
-	certFile := filepath.Join(os.TempDir(), "mediagallery_cert.pem")
-	keyFile := filepath.Join(os.TempDir(), "mediagallery_key.pem")
+	certFile := filepath.Join(os.TempDir(), "mediabrowser_cert.pem")
+	keyFile := filepath.Join(os.TempDir(), "mediabrowser_key.pem")
 
 	// Try to load existing certificate
 	if _, err := os.Stat(certFile); err == nil {
