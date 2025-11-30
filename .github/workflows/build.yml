@@ -1,7 +1,7 @@
 name: Build Media Gallery Launcher
 
 on:
-  #push:
+  push:
   #workflow_dispatch:
   
   
