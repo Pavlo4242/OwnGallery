@@ -443,16 +443,16 @@ HWND CreateHostWindow(HINSTANCE hInstance) {
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
     char currentDir[MAX_PATH];
     char specifiedDir[MAX_PATH] = {0};
-    
+
     CoInitialize(NULL);
-    
+
     // --- Enhanced argument parsing with help and directory support ---
     int argc;
     LPWSTR *argv = CommandLineToArgvW(GetCommandLineW(), &argc);
     if (argv) {
         // First pass: check for help flag
         for (int i = 1; i < argc; i++) {
-            if (wcscmp(argv[i], L"/help") == 0 || 
+            if (wcscmp(argv[i], L"/help") == 0 ||
                 wcscmp(argv[i], L"-help") == 0 ||
                 wcscmp(argv[i], L"--help") == 0 ||
                 wcscmp(argv[i], L"/?") == 0 ||
@@ -463,7 +463,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                 return 0;
             }
         }
-        
+
         // Second pass: parse other arguments
         for (int i = 1; i < argc; i++) {
             if (wcscmp(argv[i], L"/w") == 0 || wcscmp(argv[i], L"-w") == 0) {
@@ -482,10 +482,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                 // Implicit argument parsing
                 char arg[MAX_PATH];
                 WideCharToMultiByte(CP_UTF8, 0, argv[i], -1, arg, sizeof(arg), NULL, NULL);
-                
+
+                // Check if it's a directory path
                 if (strchr(arg, '\\') || strchr(arg, '/') || strchr(arg, ':')) {
-                    strncpy(specifiedDir, arg, sizeof(specifiedDir) - 1);
+                    strncpy_s(specifiedDir, sizeof(specifiedDir), arg, _TRUNCATE);
                 } else {
+                    // Check if it's a numeric port
                     BOOL isNumeric = TRUE;
                     for (int j = 0; arg[j] != '\0'; j++) {
                         if (!isdigit(arg[j])) {
@@ -501,33 +503,25 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         }
         LocalFree(argv);
     }
-    
-    // Allocate console if /w flag is set - ADDED THIS SECTION
+
+    // Allocate console if /w flag is set
     if (showConsole) {
         AllocConsole();
         freopen("CONOUT$", "w", stdout);
         freopen("CONOUT$", "w", stderr);
-        
-        // Set console title
         SetConsoleTitle("Media Browser - Debug Console");
-        
-        printf("Media Browser Launcher - Debug Mode\n");
-        printf("====================================\n");
+        printf("Media Browser Launcher - Debug Mode\n====================================\n");
         fflush(stdout);
     }
-    
+
     // Determine which directory to use
     if (specifiedDir[0] != '\0') {
         if (PathFileExists(specifiedDir) && PathIsDirectory(specifiedDir)) {
-            strncpy(currentDir, specifiedDir, sizeof(currentDir) - 1);
-            currentDir[sizeof(currentDir) - 1] = '\0';
+            strcpy_s(currentDir, sizeof(currentDir), specifiedDir);
         } else {
             char errMsg[512];
-            snprintf(errMsg, sizeof(errMsg), 
-                     "Specified directory does not exist or is invalid:\n%s\n\n"
-                     "Please provide a valid directory path.\n\n"
-                     "Run with /help for usage information.",
-                     specifiedDir);
+            snprintf(errMsg, sizeof(errMsg),
+                     "Specified directory does not exist or is invalid:\n%s", specifiedDir);
             MessageBox(NULL, errMsg, "Invalid Directory", MB_ICONERROR | MB_OK);
             CoUninitialize();
             return 1;
@@ -535,29 +529,23 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     } else {
         GetCurrentDir(currentDir, sizeof(currentDir));
     }
-    
+
     if (showConsole) {
         printf("Media Directory: %s\n", currentDir);
         printf("Port: %s\n", currentPort);
         fflush(stdout);
     }
-    
-// === FIXED: Secure, unique temp directory + exe name ===
+
+    // === Secure, unique temp directory + exe name ===
     GetTempPath(sizeof(tempExePath), tempExePath);
-    
-    // Use GUID + tick count for true uniqueness (no PID reuse issues)
     UUID uuid;
     UuidCreate(&uuid);
     char uuidStr[64];
     snprintf(uuidStr, sizeof(uuidStr), "MediaBrowser_%08x%04x%04x",
              GetTickCount(), uuid.Data4[0] << 8 | uuid.Data4[1], uuid.Data4[2] << 8 | uuid.Data4[3]);
-
-    strcat(tempExePath, uuidStr);
-    strcat(tempExePath, "\\");
+    PathAppend(tempExePath, uuidStr);
     CreateDirectory(tempExePath, NULL);
-
-    // Always use a fully unique server exe name
-   snprintf(serverExePath, sizeof(serverExePath), "%sserver.exe", tempExePath);
+    snprintf(serverExePath, sizeof(serverExePath), "%s\\server.exe", tempExePath);
 
     if (showConsole) {
         printf("Temp Path: %s\n", tempExePath);
@@ -569,8 +557,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     if (!ExtractServerBinary(serverExePath)) {
         char errMsg[512];
         snprintf(errMsg, sizeof(errMsg),
-                 "Failed to extract server binary to:\n%s\n\nError code: %lu\n\n"
-                 "Try running as Administrator or check antivirus settings.",
+                 "Failed to extract server binary to:\n%s\n\nError code: %lu",
                  serverExePath, GetLastError());
         MessageBox(NULL, errMsg, "Extraction Error", MB_ICONERROR | MB_OK);
         CleanupWithRetries(serverExePath, tempExePath);
@@ -582,16 +569,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         MessageBox(NULL, "Failed to create host window", "Error", MB_ICONERROR);
         return 1;
     }
-    
+
     if (!StartServer(currentDir, currentPort)) {
         DestroyWindow(hMainWindow);
+        CleanupWithRetries(serverExePath, tempExePath);
         return 1;
     }
-    
+
     char url[BUFFER_SIZE];
-    snprintf(url, sizeof(url), "http://localhost:%s", currentPort);
+    snprintf(url, sizeof(url), "https://localhost:%s", currentPort);
     LaunchBrowser(url);
-    
+
     nid.cbSize = sizeof(nid);
     nid.hWnd = hMainWindow;
     nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
@@ -599,27 +587,21 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     nid.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_TRAY_ICON));
     UpdateTrayTooltip(currentDir);
     Shell_NotifyIcon(NIM_ADD, &nid);
-    // This line is REQUIRED for the WM_TIMER event to fire:
     SetTimer(hMainWindow, 1, 1000, NULL);
-    
+
     MSG msg = {0};
     while (GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
-    
-    // If in console mode, wait for key press before exiting - ADDED THIS
+
     if (showConsole) {
         printf("\n\nServer has stopped. Press any key to exit...");
         fflush(stdout);
         getchar();
     }
-    
-    CloseHandle(hServerProcess);
-    CloseHandle(serverProcessInfo.hThread);
-    Sleep(1000);
+
     CleanupWithRetries(serverExePath, tempExePath);
-    
     CoUninitialize();
     return 0;
 }
