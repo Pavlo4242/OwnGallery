@@ -147,9 +147,17 @@ BOOL StartServer(const char* mediaDir, const char* port) {
         hServerProcess = NULL;
     }
 
-    STARTUPINFO si = {sizeof(si)};
-    PROCESS_INFORMATION pi;
+    STARTUPINFO si = { sizeof(si) };
+    PROCESS_INFORMATION pi = { 0 };
+
+    // PRODUCTION: hidden console
+    // DEBUG: uncomment the two lines below to see server output
+    // DWORD creationFlags = CREATE_NEW_CONSOLE;           // ← DEBUG: shows console
+    // si.wShowWindow = SW_SHOW;                           // ← DEBUG: visible window
+
     DWORD creationFlags = showConsole ? 0 : CREATE_NO_WINDOW;
+    creationFlags |= CREATE_NEW_PROCESS_GROUP;  // For Ctrl+C
+
     if (showConsole) {
         si.dwFlags = 0;
         si.wShowWindow = SW_SHOW;
@@ -158,30 +166,36 @@ BOOL StartServer(const char* mediaDir, const char* port) {
         si.wShowWindow = SW_HIDE;
     }
 
-    // Critical: Allow graceful shutdown via CTRL+C
-    creationFlags |= CREATE_NEW_PROCESS_GROUP;
-
-    
-    // --- End of conditional logic ---
-    
     char cmdLine[BUFFER_SIZE];
-    snprintf(cmdLine, sizeof(cmdLine), "\"%s\" \"%s\" %s nobrowser", 
+    snprintf(cmdLine, sizeof(cmdLine), "\"%s\" \"%s\" %s nobrowser",
              serverExePath, mediaDir, port);
-    
-    if (!CreateProcess(NULL, cmdLine, NULL, NULL, FALSE, 
-                      creationFlags, NULL, NULL, &si, &pi)) { // Pass the conditional creationFlags
-        MessageBox(NULL, "Failed to start server", "Error", MB_ICONERROR);
+
+    BOOL ok = CreateProcessA(
+        NULL, cmdLine, NULL, NULL, FALSE,
+        creationFlags, NULL, NULL, &si, &pi
+    );
+
+    if (!ok) {
+        char msg[1024];
+        snprintf(msg, sizeof(msg),
+            "Failed to start server.exe\n"
+            "Path: %s\n"
+            "Error: %lu\n\n"
+            "This is usually caused by antivirus blocking the file write.",
+            serverExePath, GetLastError());
+        MessageBoxA(NULL, msg, "Server Start Failed", MB_ICONERROR);
         return FALSE;
     }
-    
-    serverProcessInfo = pi;
+
+    CloseHandle(pi.hThread);
     hServerProcess = pi.hProcess;
-    strcpy(currentMediaDir, mediaDir);
-    strcpy(currentPort, port);
-    
+    serverProcessInfo = pi;
+
+    strcpy_s(currentMediaDir, sizeof(currentMediaDir), mediaDir);
+    strcpy_s(currentPort, sizeof(currentPort), port);
+
     return TRUE;
 }
-
 void ShowHelp() {
     const char* helpText = 
         "\n"
