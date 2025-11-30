@@ -1,7 +1,7 @@
 name: Build Media Gallery Launcher
 
 on:
-  push:
+  #push:
   #workflow_dispatch:
   
   
@@ -59,14 +59,14 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
         run: |
           cd server
-          go build -ldflags="-s -w -X main.Version=${{ github.ref_name }} -X main.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o server.bin .
+          go build -ldflags="-s -w -X main.Version=${{ github.ref_name }} -X main.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o server.exe
           dir
 
       - name: Upload Go server artifact (as Bin)
         uses: actions/upload-artifact@v4
         with:
           name: server-${{ matrix.platform }}
-          path: server/server.bin
+          path: server/server.exe
           retention-days: 1
 
   build-launcher:
@@ -102,7 +102,7 @@ jobs:
       - name: Verify server.exe exists
         run: |
           dir server
-          if (!(Test-Path "server\server.bin")) {
+          if (!(Test-Path "server\server.exe")) {
             throw "server.exe not found!"
           }
 
