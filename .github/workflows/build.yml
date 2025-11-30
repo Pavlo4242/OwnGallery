@@ -102,7 +102,7 @@ jobs:
       - name: Verify server.exe exists
         run: |
           dir server
-          if (!(Test-Path "server\server.exe")) {
+          if (!(Test-Path "server\server.bin")) {
             throw "server.exe not found!"
           }
 
