@@ -47,7 +47,7 @@ type FileInfo struct {
 }
 
 func main() {
-	log.Printf("Media Gallery Server %s (built %s)", Version, BuildTime)
+	log.Printf("Media Browser Server %s (built %s)", Version, BuildTime)
 	log.Printf("Server started with arguments: %v", os.Args) 
     
 	mediaDir, err := os.Getwd()
@@ -338,7 +338,7 @@ func generateOrLoadCertificate() (tls.Certificate, error) {
 	template := x509.Certificate{
 		SerialNumber: serialNumber,
 		Subject: pkix.Name{
-			Organization: []string{"Media Gallery Local Server"},
+			Organization: []string{"Media Browser Local Server"},
 			CommonName:   "localhost",
 		},
 		NotBefore:             time.Now(),
