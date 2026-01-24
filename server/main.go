@@ -243,7 +243,46 @@ func setupRoutes(mediaDir string) {
 			"version": Version,
 		})
 	})
-http.HandleFunc("/api/quit", func(w http.ResponseWriter, r *http.Request) {
+
+	http.HandleFunc("/api/delete", func(w http.ResponseWriter, r *http.Request) {
+		updateActivity()
+		// Only allow POST method
+		if r.Method != "POST" {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		// Decode JSON request
+		var req struct {
+			Path string `json:"path"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		// Construct full path
+		targetPath := filepath.Join(mediaDir, req.Path)
+		
+		// Basic security check to ensure we don't delete outside mediaDir
+		// Note: robust production code should resolve absolute paths for both
+		if !strings.HasPrefix(filepath.Clean(targetPath), filepath.Clean(mediaDir)) {
+			http.Error(w, "Access denied", http.StatusForbidden)
+			return
+		}
+
+		// Execute deletion
+		if err := os.Remove(targetPath); err != nil {
+			log.Printf("Error deleting file %s: %v", targetPath, err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		
+		log.Printf("Deleted file: %s", targetPath)
+		w.WriteHeader(http.StatusOK)
+	})
+
+	http.HandleFunc("/api/quit", func(w http.ResponseWriter, r *http.Request) {
         if r.Method != "POST" {
             http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
             return
