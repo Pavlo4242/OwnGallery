@@ -78,7 +78,7 @@
         </div>
 
         <!-- Multi-Select -->
-        <div class="controls-group sorting-controls" id="multiSelectGroup" style="display:none;">
+        <div class="controls-group sorting-controls" id="multiSelectGroup">
             <button id="multiSelectToggle" onclick="app.utils.toggleMultiSelect()">☑ Multi-Select</button>
             <button id="moveBtn" class="move-btn" style="display:none;" onclick="app.utils.openMoveModal()">📁 Move (<span id="selectedCountMove">0</span>)</button>
             <button id="deleteBtn" class="delete-btn" style="display:none;">🗑 Delete (<span id="selectedCount">0</span>)</button>
@@ -225,7 +225,7 @@
     
 
     <!-- Application Scripts (Load Order Critical) -->
-    <script src="globals.js"></script>
+    <script src="global.js"></script>
     <script src="utils.js"></script>
     <script src="media.js"></script>
     <script src="gallery.js"></script>

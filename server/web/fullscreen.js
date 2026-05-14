@@ -3,9 +3,8 @@
 /**
  * Open media in fullscreen mode
  * @param {string} fileName - Path to media file
-Overlay and Slideshow logic.*
- 
- */*
+ * Overlay and Slideshow logic.
+ */
 
 
 app.fullscreen = {

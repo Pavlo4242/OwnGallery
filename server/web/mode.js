@@ -65,6 +65,14 @@ app.modes = {
         this.loadNewComparison();
     },
 
+    markComparison(decision) {
+        // decision: 'left', 'right', 'both', 'neither'
+        const s = app.state;
+        s.comparisonResults.push({ decision });
+        document.getElementById('decisionCount').textContent = s.comparisonResults.length;
+        this.loadNewComparison();
+    },
+
     // --- Browsing Mode ---
     initBrowsing() {
         const grid = document.getElementById('browsingGrid');

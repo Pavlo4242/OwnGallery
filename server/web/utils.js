@@ -1,4 +1,4 @@
-/*Restores: Delete Logic, Multi-select Toggle, Favorites, and Quick Preview.*
+/*Restores: Delete Logic, Multi-select Toggle, Favorites, and Quick Preview.*/
 
 
 app.utils = {
@@ -10,43 +10,46 @@ app.utils = {
     async fetchRootPath() {
         try {
             const res = await fetch('/api/root_dir');
-            if(res.ok) document.getElementById('folderName').textContent = (await res.json()).root_dir;
-        } catch (e) {}
+            if (res.ok) document.getElementById('folderName').textContent = (await res.json()).root_dir;
+        } catch (e) { }
     },
     quitServer() {
         if (!confirm('Stop media server?')) return;
         fetch('/api/quit', { method: 'POST' }).then(() => document.body.innerHTML = '<h1>Server Stopped</h1>');
     },
+    openExplorer() {
+        fetch('/api/open_explorer').catch(() => {});
+    },
 
     getFileExtension(fileName) {
-    const parts = fileName.split('.');
-    return parts.length > 1 ? parts[parts.length - 1].toUpperCase() : 'FILE';
-},
+        const parts = fileName.split('.');
+        return parts.length > 1 ? parts[parts.length - 1].toUpperCase() : 'FILE';
+    },
 
-// --- Update toggleQuickPreview logic in utils.js to manage DOM ---
-toggleQuickPreview: (isChecked) => {
-    app.state.quickPreviewEnabled = isChecked;
-    app.utils.saveSettings();
-    if (!isChecked) app.utils.hideQuickPreview();
-},
+    // --- Update toggleQuickPreview logic in utils.js to manage DOM ---
+    toggleQuickPreview: (isChecked) => {
+        app.state.quickPreviewEnabled = isChecked;
+        app.utils.saveSettings();
+        if (!isChecked) app.utils.hideQuickPreview();
+    },
 
-// --- Add Favorites Filtering (from DELui.js) ---
-filterFavorites: () => {
-    const s = app.state;
-    document.getElementById('folderFilter').value = 'all'; 
-    
-    // Filter the full map down to only files that are in the favorites Set
-    s.allMediaFiles = Array.from(s.favoriteFiles).filter(f => s.MEDIA_DATA[f]);
-    s.loadedMediaCount = 0;
-    
-    // Reset Grid
-    const grid = document.querySelector('.grid');
-    if (s.masonry) { s.masonry.destroy(); s.masonry = null; }
-    grid.innerHTML = '';
-    
-    app.gallery.updateCounter();
-    app.gallery.loadMore();
-}
+    // --- Add Favorites Filtering (from DELui.js) ---
+    filterFavorites: () => {
+        const s = app.state;
+        document.getElementById('folderFilter').value = 'all';
+
+        // Filter the full map down to only files that are in the favorites Set
+        s.allMediaFiles = Array.from(s.favoriteFiles).filter(f => s.MEDIA_DATA[f]);
+        s.loadedMediaCount = 0;
+
+        // Reset Grid
+        const grid = document.querySelector('.grid');
+        if (s.masonry) { s.masonry.destroy(); s.masonry = null; }
+        grid.innerHTML = '';
+
+        app.gallery.updateCounter();
+        app.gallery.loadMore();
+    },
 
     // --- Selection & Deletion ---
     toggleMultiSelect() {
@@ -72,26 +75,26 @@ filterFavorites: () => {
         const btn = document.getElementById('deleteBtn');
         const moveBtn = document.getElementById('moveBtn');
         const hasSelection = app.state.selectedFiles.size > 0;
-        
+
         if (btn) btn.style.display = hasSelection ? 'inline-block' : 'none';
         if (moveBtn) moveBtn.style.display = hasSelection ? 'inline-block' : 'none';
-        
+
         const count = document.getElementById('selectedCount');
         if (count) count.textContent = app.state.selectedFiles.size;
-        
+
         const countMove = document.getElementById('selectedCountMove');
         if (countMove) countMove.textContent = app.state.selectedFiles.size;
     },
     async deleteSelected() {
         if (app.state.selectedFiles.size === 0 || !confirm(`Delete ${app.state.selectedFiles.size} files?`)) return;
-        
+
         const paths = Array.from(app.state.selectedFiles);
         await fetch('/api/delete', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ paths })
         });
-        
+
         app.state.selectedFiles.clear();
         app.main.init(); // Reload
     },
@@ -101,31 +104,31 @@ filterFavorites: () => {
         const modal = document.getElementById('moveModal');
         const select = document.getElementById('moveFolderSelect');
         const title = document.getElementById('modalTitle');
-        
+
         title.textContent = `Move ${app.state.selectedFiles.size} files`;
-        
+
         // Populate folders
         const folders = Object.keys(app.state.FOLDER_MAP).filter(f => f !== 'all').sort();
-        select.innerHTML = '<option value="">Select destination...</option>' + 
+        select.innerHTML = '<option value="">Select destination...</option>' +
             folders.map(f => `<option value="${f}">${f}</option>`).join('');
-            
+
         // Reset state
         document.getElementById('createNewFolderCheck').checked = false;
         this.toggleNewFolderInput();
         document.getElementById('newFolderName').value = '';
-        
+
         modal.style.display = 'flex';
     },
-    
+
     closeMoveModal() {
         document.getElementById('moveModal').style.display = 'none';
     },
-    
+
     toggleNewFolderInput() {
         const isChecked = document.getElementById('createNewFolderCheck').checked;
         const input = document.getElementById('newFolderName');
         const select = document.getElementById('moveFolderSelect');
-        
+
         if (isChecked) {
             input.style.display = 'block';
             select.disabled = true;
@@ -134,32 +137,32 @@ filterFavorites: () => {
             select.disabled = false;
         }
     },
-    
+
     openNewFolderModal() {
         const modal = document.getElementById('moveModal');
         const title = document.getElementById('modalTitle');
         title.textContent = 'Create New Folder';
-        
+
         document.getElementById('modalDescription').style.display = 'none';
         document.getElementById('moveFolderSelect').style.display = 'none';
         document.getElementById('createNewFolderCheck').parentElement.style.display = 'none';
-        
+
         const input = document.getElementById('newFolderName');
         input.style.display = 'block';
         input.value = '';
-        
+
         // Temporarily override submitMove logic to just create folder
         modal.dataset.mode = 'create_only';
         modal.style.display = 'flex';
     },
-    
+
     async submitMove() {
         const modal = document.getElementById('moveModal');
         const isCreateOnly = modal.dataset.mode === 'create_only';
         let targetFolder = '';
-        
+
         const isNewFolder = document.getElementById('createNewFolderCheck').checked || isCreateOnly;
-        
+
         if (isNewFolder) {
             targetFolder = document.getElementById('newFolderName').value.trim();
             if (!targetFolder) {
@@ -174,23 +177,23 @@ filterFavorites: () => {
                 return;
             }
         }
-        
+
         if (isCreateOnly) {
             await fetch('/api/mkdir', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ path: targetFolder })
             });
         } else {
             const paths = Array.from(app.state.selectedFiles);
             await fetch('/api/move', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ paths, target: targetFolder })
             });
             app.state.selectedFiles.clear();
         }
-        
+
         // Reset modal state
         modal.dataset.mode = '';
         document.getElementById('modalDescription').style.display = 'block';
