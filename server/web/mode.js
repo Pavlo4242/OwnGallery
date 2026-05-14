@@ -3,7 +3,7 @@
 /**
  * Switch between the three main modes: Sorting, Comparing, Browsing
  * @param {string} mode - The mode to switch to
- Logic for Sorting, Comparing, and Browsing modes.*
+ * Logic for Sorting, Comparing, and Browsing modes.
  */
 
 
