@@ -13,6 +13,7 @@ jobs:
   build-go-server:
     name: Build Go Server for ${{ matrix.platform }}
     runs-on: ${{ matrix.os }}
+    strategy:
       matrix:
         include:
           - os: windows-latest
