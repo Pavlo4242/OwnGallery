@@ -4,7 +4,7 @@
 app.utils = {
     // --- API Calls ---
     async fetchFiles() {
-        const response = await fetch('/api/files');
+        const response = await fetch('/api/files?t=' + Date.now()); // Prevent caching
         return await response.json();
     },
     async fetchRootPath() {
