@@ -155,10 +155,43 @@ app.fullscreen = {
         });
 
         if (res.ok) {
+            app.utils.showToast('Renamed successfully', 'success');
             app.fullscreen.close();
             app.main.init();
         } else {
-            alert('Rename failed: ' + (await res.text()));
+            app.utils.showToast('Rename failed: ' + (await res.text()), 'error');
+        }
+    },
+
+    // Delete current fullscreen file
+    async deleteCurrentFile() {
+        const s = app.state;
+        const fileName = s._currentFullscreenFile;
+        if (!fileName) return;
+        if (!confirm(`Delete "${s.MEDIA_DATA[fileName]?.name}"?`)) return;
+
+        const res = await fetch('/api/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ paths: [fileName] })
+        });
+
+        const data = await res.json().catch(() => null);
+        if (data && (data.success || []).length > 0) {
+            app.utils.showToast('Deleted file', 'success');
+            // Navigate to next image or close if last
+            const nextIdx = s.currentMediaIndex;
+            this.close();
+            // Remove from data
+            delete s.MEDIA_DATA[fileName];
+            s.allMediaFiles = s.allMediaFiles.filter(f => f !== fileName);
+            if (s.allMediaFiles.length > 0) {
+                const safeIdx = Math.min(nextIdx, s.allMediaFiles.length - 1);
+                this.open(s.allMediaFiles[safeIdx]);
+            }
+            app.gallery.updateCounter();
+        } else {
+            app.utils.showToast('Delete failed', 'error');
         }
     }
 };

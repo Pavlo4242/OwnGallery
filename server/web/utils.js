@@ -62,6 +62,10 @@ app.utils = {
         }
     },
     toggleSelection(fileName, itemDom, isChecked) {
+        // Resolve fileName from DOM if not provided (keyboard shortcut path)
+        if (!fileName && itemDom) fileName = itemDom.dataset.fileName;
+        if (!fileName) return;
+
         if (isChecked) {
             app.state.selectedFiles.add(fileName);
             itemDom.classList.add('selected');

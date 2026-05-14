@@ -43,6 +43,7 @@ app.media = {
             item.className = isListView ? 'list-item' : 'grid-item';
             if (!isListView) item.style.width = `${width}px`;
             if (isSelected) item.classList.add('selected');
+            item.dataset.fileName = fileName; // Store for keyboard/drag access
 
             // 1. Multi-Select Checkbox
             if (app.state.multiSelectMode) {

@@ -118,6 +118,7 @@ app.main = {
                 if (e.key === 'Escape') app.fullscreen.close();
                 if (e.key === ' ') { e.preventDefault(); app.fullscreen.toggleSlideshow(); }
                 if (e.key === 'F2') app.fullscreen.renameCurrentFile(); // #13
+                if (e.key === 'Delete') app.fullscreen.deleteCurrentFile(); // Delete in fullscreen
                 return;
             }
 
