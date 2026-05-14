@@ -102,13 +102,60 @@ app.main = {
         const btnList = document.getElementById('listViewBtn');
         if (btnList) btnList.onclick = () => { app.state.viewMode = 'list'; app.gallery.filterByFolder(false); app.utils.saveSettings(); };
 
-        // Fullscreen Keyboard
+        // Fullscreen & Global Keyboard
         document.addEventListener('keydown', (e) => {
-            if (!document.getElementById('fullscreenOverlay').classList.contains('visible')) return;
-            if (e.key === 'ArrowRight') app.fullscreen.navigate(1);
-            if (e.key === 'ArrowLeft') app.fullscreen.navigate(-1);
-            if (e.key === 'Escape') app.fullscreen.close();
-            if (e.key === ' ') { e.preventDefault(); app.fullscreen.toggleSlideshow(); }
+            const isFullscreen = document.getElementById('fullscreenOverlay').classList.contains('visible');
+            const isModal = document.getElementById('moveModal').style.display === 'flex';
+            
+            if (isFullscreen) {
+                if (e.key === 'ArrowRight') app.fullscreen.navigate(1);
+                if (e.key === 'ArrowLeft') app.fullscreen.navigate(-1);
+                if (e.key === 'Escape') app.fullscreen.close();
+                if (e.key === ' ') { e.preventDefault(); app.fullscreen.toggleSlideshow(); }
+                return;
+            }
+
+            if (isModal) {
+                if (e.key === 'Escape') app.utils.closeMoveModal();
+                if (e.key === 'Enter' && !e.target.tagName === 'TEXTAREA') app.utils.submitMove();
+                return;
+            }
+
+            // Grid Navigation
+            if (e.key === 'ArrowRight') { e.preventDefault(); app.gallery.moveFocus('right'); }
+            if (e.key === 'ArrowLeft') { e.preventDefault(); app.gallery.moveFocus('left'); }
+            if (e.key === 'ArrowUp') { e.preventDefault(); app.gallery.moveFocus('up'); }
+            if (e.key === 'ArrowDown') { e.preventDefault(); app.gallery.moveFocus('down'); }
+
+            // Actions
+            if (e.key === 'Enter') {
+                const idx = app.state.focusedIndex;
+                const items = document.querySelectorAll('.grid-item');
+                if (idx !== -1 && items[idx]) items[idx].click();
+            }
+            if (e.key === ' ' && app.state.multiSelectMode) {
+                e.preventDefault();
+                const idx = app.state.focusedIndex;
+                const items = document.querySelectorAll('.grid-item');
+                if (idx !== -1 && items[idx]) {
+                    const cb = items[idx].querySelector('input[type="checkbox"]');
+                    if (cb) { cb.checked = !cb.checked; app.utils.toggleSelection(null, items[idx], cb.checked); }
+                }
+            }
+            if (e.key === 'm' || e.key === 'M') app.utils.toggleMultiSelect();
+            if (e.key === 'Delete') app.utils.deleteSelected();
+            if (e.key === 's' || e.key === 'S') app.gallery.shuffle();
+            if (e.key === 'f' || e.key === 'F') app.utils.filterFavorites();
+            if (e.key === 'r' || e.key === 'R') app.main.init();
+            
+            // Numeric Sort Shortcuts (1-6)
+            if (e.key >= '1' && e.key <= '6') {
+                const sortSelect = document.getElementById('sortFilter');
+                if (sortSelect) {
+                    sortSelect.selectedIndex = parseInt(e.key) - 1;
+                    app.gallery.handleSortChange();
+                }
+            }
         });
         
         document.getElementById('playPauseBtn').onclick = () => app.fullscreen.toggleSlideshow();

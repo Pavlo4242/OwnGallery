@@ -948,3 +948,11 @@ body {
     background: #4CAF50 !important;
     color: white !important;
 }
+
+.grid-item.focused {
+    outline: 4px solid #2196F3 !important;
+    outline-offset: 4px;
+    transform: translateY(-8px);
+    box-shadow: 0 12px 24px rgba(33, 150, 243, 0.4);
+    z-index: 15;
+}

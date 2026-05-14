@@ -24,6 +24,7 @@ app.state = {
     historyIndex: -1,
     navigationHistory: [],
     sortBy: 'name_asc', // Default sort mode
+    focusedIndex: -1,   // Current focused item index in grid
     
     // Playback/Interaction
     masonry: null,

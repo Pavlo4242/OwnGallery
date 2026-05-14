@@ -8,6 +8,7 @@ app.gallery = {
         document.getElementById('galleryDir').textContent = folder === 'all' ? 'Root' : folder;
         if (s.masonry) { s.masonry.destroy(); s.masonry = null; }
         grid.innerHTML = '';
+        s.focusedIndex = -1;
 
         // History Management
         if (recordHistory) {
@@ -177,5 +178,53 @@ app.gallery = {
         app.fullscreen.close();
         this.filterByFolder(true);
         window.scrollTo({top: 0, behavior: 'smooth'});
+    },
+
+    setFocus(index) {
+        const s = app.state;
+        const items = document.querySelectorAll('.grid-item');
+        if (items.length === 0) return;
+
+        // Remove old focus
+        items.forEach(el => el.classList.remove('focused'));
+
+        // Clamp index
+        if (index < 0) index = 0;
+        if (index >= items.length) index = items.length - 1;
+
+        s.focusedIndex = index;
+        const target = items[index];
+        if (target) {
+            target.classList.add('focused');
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            
+            // Trigger hover behavior for video playback
+            app.state.hoveredMedia = target;
+            app.media.managePlayback();
+        }
+    },
+
+    moveFocus(dir) {
+        const s = app.state;
+        const items = document.querySelectorAll('.grid-item');
+        if (items.length === 0) return;
+
+        let newIndex = s.focusedIndex;
+        if (newIndex === -1) {
+            newIndex = 0;
+        } else {
+            // Simple heuristic for masonry: 
+            // Left/Right = +/- 1
+            // Up/Down = +/- (items per row)
+            const width = parseInt(document.getElementById('thumbnailWidth').value) || 250;
+            const cols = Math.max(1, Math.floor(window.innerWidth / (width + 20)));
+
+            if (dir === 'left') newIndex--;
+            else if (dir === 'right') newIndex++;
+            else if (dir === 'up') newIndex -= cols;
+            else if (dir === 'down') newIndex += cols;
+        }
+
+        this.setFocus(newIndex);
     }
 };
