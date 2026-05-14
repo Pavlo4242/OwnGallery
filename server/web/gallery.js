@@ -27,10 +27,7 @@ app.gallery = {
             ? [...s.FOLDER_MAP['all']] 
             : s.FOLDER_MAP['all'].filter(f => f.startsWith(folder + '/'));
 
-        // Apply Shuffle if active (optional restoration of feature)
-        // if (s.isShuffled) app.utils.shuffleArray(displayList);
-
-        s.allMediaFiles = displayList;
+        s.allMediaFiles = this.sortFiles(displayList);
         s.loadedMediaCount = 0;
         
         app.media.appendBatch(s.allMediaFiles.slice(0, s.filesPerLoad));
@@ -130,6 +127,39 @@ app.gallery = {
         select.innerHTML = opts.join('');
         select.value = current;
         fsSelect.innerHTML = fsOpts.join('');
+    },
+
+    handleSortChange() {
+        app.state.sortBy = document.getElementById('sortFilter').value;
+        app.utils.saveSettings();
+        this.filterByFolder(false);
+    },
+
+    sortFiles(files) {
+        const s = app.state;
+        const sortMode = s.sortBy || 'name_asc';
+        
+        return files.sort((a, b) => {
+            const dataA = s.MEDIA_DATA[a];
+            const dataB = s.MEDIA_DATA[b];
+            if (!dataA || !dataB) return 0;
+            
+            switch (sortMode) {
+                case 'name_desc':
+                    return dataB.name.localeCompare(dataA.name, undefined, {numeric: true});
+                case 'date_desc':
+                    return new Date(dataB.modified) - new Date(dataA.modified);
+                case 'date_asc':
+                    return new Date(dataA.modified) - new Date(dataB.modified);
+                case 'size_desc':
+                    return (dataB.size || 0) - (dataA.size || 0);
+                case 'size_asc':
+                    return (dataA.size || 0) - (dataB.size || 0);
+                case 'name_asc':
+                default:
+                    return dataA.name.localeCompare(dataB.name, undefined, {numeric: true});
+            }
+        });
     },
 
     shuffle() {
