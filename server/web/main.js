@@ -19,7 +19,7 @@ app.main = {
             
             files.forEach(f => {
                 const webUrl = `/media/${f.path}`;
-                app.state.MEDIA_DATA[f.path] = { name: f.name, isVideo: f.isVideo, url: webUrl };
+                app.state.MEDIA_DATA[f.path] = { name: f.name, isVideo: f.isVideo, url: webUrl, size: f.size, modified: f.modified };
                 app.state.FOLDER_MAP['all'].push(f.path);
                 const dir = f.path.split('/').slice(0, -1).join('/');
                 if(app.state.FOLDER_MAP[dir]) app.state.FOLDER_MAP[dir].push(f.path);
