@@ -49,6 +49,20 @@
         <div class="controls-group sorting-controls">
             <label>Folder:</label>
             <select id="folderFilter" onchange="app.gallery.filterByFolder()"></select>
+            <button onclick="app.utils.openNewFolderModal()" title="Create new folder">➕ New Folder</button>
+        </div>
+
+        <!-- Sort Controls -->
+        <div class="controls-group sorting-controls browsing-controls">
+            <label>Sort By:</label>
+            <select id="sortFilter" onchange="app.gallery.handleSortChange()">
+                <option value="name_asc">Name (A-Z)</option>
+                <option value="name_desc">Name (Z-A)</option>
+                <option value="date_desc">Date (Newest)</option>
+                <option value="date_asc">Date (Oldest)</option>
+                <option value="size_desc">Size (Largest)</option>
+                <option value="size_asc">Size (Smallest)</option>
+            </select>
         </div>
 
         <!-- Action Controls -->
@@ -66,6 +80,7 @@
         <!-- Multi-Select -->
         <div class="controls-group sorting-controls" id="multiSelectGroup" style="display:none;">
             <button id="multiSelectToggle" onclick="app.utils.toggleMultiSelect()">☑ Multi-Select</button>
+            <button id="moveBtn" class="move-btn" style="display:none;" onclick="app.utils.openMoveModal()">📁 Move (<span id="selectedCountMove">0</span>)</button>
             <button id="deleteBtn" class="delete-btn" style="display:none;">🗑 Delete (<span id="selectedCount">0</span>)</button>
         </div>
 
@@ -161,6 +176,25 @@
     <div class="nav-fab-container">
         <div class="nav-fab" onclick="window.scrollTo({top:0, behavior:'smooth'})" title="Scroll to top">⌂</div>
         <div class="nav-fab" onclick="window.scrollBy({top:800, behavior:'smooth'})" title="Scroll down">↓</div>
+    </div>
+
+    <!-- Move/New Folder Modal -->
+    <div id="moveModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <h3 id="modalTitle">Move Files</h3>
+            <div id="modalDescription">Select destination folder:</div>
+            <select id="moveFolderSelect"></select>
+            
+            <div class="new-folder-section">
+                <label><input type="checkbox" id="createNewFolderCheck" onchange="app.utils.toggleNewFolderInput()"> Create new folder instead</label>
+                <input type="text" id="newFolderName" placeholder="Enter new folder name" style="display:none; width: 100%; margin-top: 10px;">
+            </div>
+            
+            <div class="modal-actions">
+                <button onclick="app.utils.closeMoveModal()">Cancel</button>
+                <button class="primary-btn" onclick="app.utils.submitMove()">Confirm</button>
+            </div>
+        </div>
     </div>
 
     
