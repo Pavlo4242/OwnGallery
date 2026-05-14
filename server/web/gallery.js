@@ -238,18 +238,39 @@ app.gallery = {
 
         let newIndex = s.focusedIndex;
         if (newIndex === -1) {
-            newIndex = 0;
-        } else {
-            // Simple heuristic for masonry: 
-            // Left/Right = +/- 1
-            // Up/Down = +/- (items per row)
-            const width = parseInt(document.getElementById('thumbnailWidth').value) || 250;
-            const cols = Math.max(1, Math.floor(window.innerWidth / (width + 20)));
+            this.setFocus(0);
+            return;
+        }
 
-            if (dir === 'left') newIndex--;
-            else if (dir === 'right') newIndex++;
-            else if (dir === 'up') newIndex -= cols;
-            else if (dir === 'down') newIndex += cols;
+        const currentRect = items[newIndex].getBoundingClientRect();
+
+        if (dir === 'left') {
+            newIndex--;
+        } else if (dir === 'right') {
+            newIndex++;
+        } else {
+            // Spatial search for Up/Down
+            let closest = -1;
+            let minDist = Infinity;
+
+            for (let i = 0; i < items.length; i++) {
+                if (i === newIndex) continue;
+                const rect = items[i].getBoundingClientRect();
+                
+                if (dir === 'up' && rect.top >= currentRect.top - 5) continue;
+                if (dir === 'down' && rect.top <= currentRect.top + 5) continue;
+
+                // Distance calculation heavily penalizes X difference to enforce columns
+                const dx = Math.abs(rect.left - currentRect.left);
+                const dy = Math.abs(rect.top - currentRect.top);
+                const distance = (dx * 10) + dy;
+
+                if (distance < minDist) {
+                    minDist = distance;
+                    closest = i;
+                }
+            }
+            if (closest !== -1) newIndex = closest;
         }
 
         this.setFocus(newIndex);
