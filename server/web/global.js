@@ -1,5 +1,3 @@
-
-```javascript
 // Define the global application namespace
 window.app = window.app || {};
 
@@ -25,6 +23,7 @@ app.state = {
     filesPerLoad: 30,
     historyIndex: -1,
     navigationHistory: [],
+    sortBy: 'name_asc', // Default sort mode
     
     // Playback/Interaction
     masonry: null,
