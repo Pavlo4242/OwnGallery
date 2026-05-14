@@ -209,11 +209,11 @@ app.gallery = {
 
     setFocus(index) {
         const s = app.state;
-        const items = document.querySelectorAll('.grid-item');
+        const items = document.querySelectorAll('.grid-item:not(.folder-card)');
         if (items.length === 0) return;
 
-        // Remove old focus
-        items.forEach(el => el.classList.remove('focused'));
+        // Remove old focus from ALL grid items (including folder cards)
+        document.querySelectorAll('.grid-item.focused').forEach(el => el.classList.remove('focused'));
 
         // Clamp index
         if (index < 0) index = 0;
@@ -233,44 +233,46 @@ app.gallery = {
 
     moveFocus(dir) {
         const s = app.state;
-        const items = document.querySelectorAll('.grid-item');
+        const items = document.querySelectorAll('.grid-item:not(.folder-card)');
         if (items.length === 0) return;
 
         let newIndex = s.focusedIndex;
-        if (newIndex === -1) {
+        if (newIndex === -1 || newIndex >= items.length) {
             this.setFocus(0);
             return;
         }
 
-        const currentRect = items[newIndex].getBoundingClientRect();
-
         if (dir === 'left') {
-            newIndex--;
+            newIndex = Math.max(0, newIndex - 1);
         } else if (dir === 'right') {
-            newIndex++;
+            newIndex = Math.min(items.length - 1, newIndex + 1);
         } else {
-            // Spatial search for Up/Down
-            let closest = -1;
-            let minDist = Infinity;
+            // Up/Down: find the item in the same column on the row above/below
+            const currentRect = items[newIndex].getBoundingClientRect();
+            let best = -1;
+            let bestDist = Infinity;
 
             for (let i = 0; i < items.length; i++) {
                 if (i === newIndex) continue;
                 const rect = items[i].getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const currentCenterX = currentRect.left + currentRect.width / 2;
                 
+                // Only consider items on a different row
                 if (dir === 'up' && rect.top >= currentRect.top - 5) continue;
-                if (dir === 'down' && rect.top <= currentRect.top + 5) continue;
+                if (dir === 'down' && rect.bottom <= currentRect.bottom + 5) continue;
 
-                // Distance calculation heavily penalizes X difference to enforce columns
-                const dx = Math.abs(rect.left - currentRect.left);
+                // Prefer same column (small X difference), then closest row
+                const dx = Math.abs(centerX - currentCenterX);
                 const dy = Math.abs(rect.top - currentRect.top);
-                const distance = (dx * 10) + dy;
+                const dist = dx + dy * 0.1; // Heavily favor same column
 
-                if (distance < minDist) {
-                    minDist = distance;
-                    closest = i;
+                if (dist < bestDist) {
+                    bestDist = dist;
+                    best = i;
                 }
             }
-            if (closest !== -1) newIndex = closest;
+            if (best !== -1) newIndex = best;
         }
 
         this.setFocus(newIndex);

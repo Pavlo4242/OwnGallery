@@ -54,9 +54,36 @@ app.utils = {
     // --- Selection & Deletion ---
     toggleMultiSelect() {
         app.state.multiSelectMode = !app.state.multiSelectMode;
-        // Re-render current view to show/hide checkboxes
-        app.gallery.filterByFolder(false);
-        if (!app.state.multiSelectMode) {
+        const isOn = app.state.multiSelectMode;
+        
+        // Update button text
+        const btn = document.getElementById('multiSelectToggle');
+        if (btn) btn.textContent = isOn ? '☑ Multi-Select ON' : '☑ Multi-Select';
+
+        // Patch existing grid items: add or remove checkboxes WITHOUT re-rendering
+        document.querySelectorAll('.grid-item:not(.folder-card)').forEach(item => {
+            const fileName = item.dataset.fileName;
+            if (!fileName) return;
+            
+            if (isOn) {
+                // Add checkbox if not already there
+                if (!item.querySelector('.grid-item-checkbox')) {
+                    const cb = document.createElement('input');
+                    cb.type = 'checkbox';
+                    cb.className = 'grid-item-checkbox';
+                    cb.checked = app.state.selectedFiles.has(fileName);
+                    cb.onclick = (e) => { e.stopPropagation(); app.utils.toggleSelection(fileName, item, cb.checked); };
+                    item.insertBefore(cb, item.firstChild);
+                }
+            } else {
+                // Remove checkbox
+                const cb = item.querySelector('.grid-item-checkbox');
+                if (cb) cb.remove();
+                item.classList.remove('selected');
+            }
+        });
+
+        if (!isOn) {
             app.state.selectedFiles.clear();
             this.updateDeleteBtn();
         }

@@ -36,7 +36,10 @@ app.main = {
             grid.innerHTML = `<div class="loading">Error: ${e.message}</div>`;
         }
         
-        this.setupEventListeners();
+        if (!app.state._listenersAttached) {
+            this.setupEventListeners();
+            app.state._listenersAttached = true;
+        }
     },
 
     setupObservers() {
@@ -128,32 +131,49 @@ app.main = {
                 return;
             }
 
-            // Grid Navigation
-            if (e.key === 'ArrowRight') { e.preventDefault(); app.gallery.moveFocus('right'); }
-            if (e.key === 'ArrowLeft') { e.preventDefault(); app.gallery.moveFocus('left'); }
-            if (e.key === 'ArrowUp') { e.preventDefault(); app.gallery.moveFocus('up'); }
-            if (e.key === 'ArrowDown') { e.preventDefault(); app.gallery.moveFocus('down'); }
+            // Grid Navigation — only target media items, skip folder cards
+            const isArrow = ['ArrowRight','ArrowLeft','ArrowUp','ArrowDown'].includes(e.key);
+            if (isArrow) {
+                e.preventDefault();
+                const dirMap = { ArrowRight: 'right', ArrowLeft: 'left', ArrowUp: 'up', ArrowDown: 'down' };
+                app.gallery.moveFocus(dirMap[e.key]);
+                return;
+            }
 
-            // Actions
+            // Enter — open focused item
             if (e.key === 'Enter') {
                 const idx = app.state.focusedIndex;
-                const items = document.querySelectorAll('.grid-item');
+                const items = document.querySelectorAll('.grid-item:not(.folder-card)');
                 if (idx !== -1 && items[idx]) items[idx].click();
+                return;
             }
-            if (e.key === ' ' && app.state.multiSelectMode) {
+
+            // Spacebar — toggle selection on focused item
+            if (e.key === ' ') {
                 e.preventDefault();
-                const idx = app.state.focusedIndex;
-                const items = document.querySelectorAll('.grid-item');
-                if (idx !== -1 && items[idx]) {
-                    const cb = items[idx].querySelector('input[type="checkbox"]');
-                    if (cb) { cb.checked = !cb.checked; app.utils.toggleSelection(null, items[idx], cb.checked); }
+                const savedIdx = app.state.focusedIndex;
+                if (savedIdx === -1) return; // Nothing focused yet
+                
+                // Auto-enable multi-select if not already on
+                if (!app.state.multiSelectMode) {
+                    app.utils.toggleMultiSelect(); // Patches DOM, no re-render
                 }
+                const items = document.querySelectorAll('.grid-item:not(.folder-card)');
+                if (savedIdx < items.length && items[savedIdx]) {
+                    const cb = items[savedIdx].querySelector('input[type="checkbox"]');
+                    if (cb) { cb.checked = !cb.checked; app.utils.toggleSelection(null, items[savedIdx], cb.checked); }
+                }
+                return;
             }
-            if (e.key === 'm' || e.key === 'M') app.utils.toggleMultiSelect();
-            if (e.key === 'Delete') app.utils.deleteSelected();
-            if (e.key === 's' || e.key === 'S') app.gallery.shuffle();
-            if (e.key === 'f' || e.key === 'F') app.utils.filterFavorites();
-            if (e.key === 'r' || e.key === 'R') app.main.init();
+
+            // Single-key shortcuts — don't fire when typing in an input
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+
+            if (e.key === 'm' || e.key === 'M') { app.utils.toggleMultiSelect(); return; }
+            if (e.key === 'Delete') { app.utils.deleteSelected(); return; }
+            if (e.key === 's' || e.key === 'S') { app.gallery.shuffle(); return; }
+            if (e.key === 'f' || e.key === 'F') { app.utils.filterFavorites(); return; }
+            if (e.key === 'r' || e.key === 'R') { app.main.init(); return; }
             
             // Numeric Sort Shortcuts (1-6)
             if (e.key >= '1' && e.key <= '6') {
@@ -162,6 +182,7 @@ app.main = {
                     sortSelect.selectedIndex = parseInt(e.key) - 1;
                     app.gallery.handleSortChange();
                 }
+                return;
             }
             // #9: Help overlay
             if (e.key === '?') {

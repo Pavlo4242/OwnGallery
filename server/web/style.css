@@ -256,6 +256,22 @@ body {
     position: relative;
 }
 
+.grid-item-checkbox {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    width: 20px;
+    height: 20px;
+    z-index: 10;
+    cursor: pointer;
+    accent-color: #4CAF50;
+}
+
+.grid-item.selected {
+    outline: 3px solid #4CAF50;
+    outline-offset: -3px;
+}
+
 .grid-item:hover {
     transform: translateY(-8px);
     box-shadow: 0 12px 24px rgba(0,0,0,0.5);
