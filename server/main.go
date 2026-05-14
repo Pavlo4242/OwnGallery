@@ -254,6 +254,77 @@ func setupRoutes(mediaDir string) {
 
 		// Decode JSON request
 		var req struct {
+			Paths []string `json:"paths"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		for _, p := range req.Paths {
+			targetPath := filepath.Join(mediaDir, p)
+			if !strings.HasPrefix(filepath.Clean(targetPath), filepath.Clean(mediaDir)) {
+				continue // Skip invalid paths
+			}
+			if err := os.Remove(targetPath); err != nil {
+				log.Printf("Error deleting file %s: %v", targetPath, err)
+			} else {
+				log.Printf("Deleted file: %s", targetPath)
+			}
+		}
+		
+		w.WriteHeader(http.StatusOK)
+	})
+
+	http.HandleFunc("/api/move", func(w http.ResponseWriter, r *http.Request) {
+		updateActivity()
+		if r.Method != "POST" {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var req struct {
+			Paths []string `json:"paths"`
+			Target string `json:"target"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		targetDir := filepath.Join(mediaDir, req.Target)
+		if !strings.HasPrefix(filepath.Clean(targetDir), filepath.Clean(mediaDir)) {
+			http.Error(w, "Invalid target path", http.StatusForbidden)
+			return
+		}
+		
+		// Create target dir if it doesn't exist
+		os.MkdirAll(targetDir, 0755)
+
+		for _, p := range req.Paths {
+			sourcePath := filepath.Join(mediaDir, p)
+			if !strings.HasPrefix(filepath.Clean(sourcePath), filepath.Clean(mediaDir)) {
+				continue
+			}
+			destPath := filepath.Join(targetDir, filepath.Base(p))
+			if err := os.Rename(sourcePath, destPath); err != nil {
+				log.Printf("Error moving file %s to %s: %v", sourcePath, destPath, err)
+			} else {
+				log.Printf("Moved file: %s -> %s", sourcePath, destPath)
+			}
+		}
+		
+		w.WriteHeader(http.StatusOK)
+	})
+
+	http.HandleFunc("/api/mkdir", func(w http.ResponseWriter, r *http.Request) {
+		updateActivity()
+		if r.Method != "POST" {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var req struct {
 			Path string `json:"path"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -261,24 +332,19 @@ func setupRoutes(mediaDir string) {
 			return
 		}
 
-		// Construct full path
-		targetPath := filepath.Join(mediaDir, req.Path)
-		
-		// Basic security check to ensure we don't delete outside mediaDir
-		// Note: robust production code should resolve absolute paths for both
-		if !strings.HasPrefix(filepath.Clean(targetPath), filepath.Clean(mediaDir)) {
-			http.Error(w, "Access denied", http.StatusForbidden)
+		targetDir := filepath.Join(mediaDir, req.Path)
+		if !strings.HasPrefix(filepath.Clean(targetDir), filepath.Clean(mediaDir)) {
+			http.Error(w, "Invalid path", http.StatusForbidden)
 			return
 		}
 
-		// Execute deletion
-		if err := os.Remove(targetPath); err != nil {
-			log.Printf("Error deleting file %s: %v", targetPath, err)
+		if err := os.MkdirAll(targetDir, 0755); err != nil {
+			log.Printf("Error creating directory %s: %v", targetDir, err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		
-		log.Printf("Deleted file: %s", targetPath)
+
+		log.Printf("Created directory: %s", targetDir)
 		w.WriteHeader(http.StatusOK)
 	})
 
