@@ -102,26 +102,53 @@ app.utils = {
 
     async deleteSelected() {
         if (app.state.selectedFiles.size === 0) return;
-        if (!confirm(`Delete ${app.state.selectedFiles.size} files?`)) return;
+        if (app.state.isDeleting) return; // Prevent popup spam if holding Delete key
+        app.state.isDeleting = true;
 
-        const paths = Array.from(app.state.selectedFiles);
-        const res = await fetch('/api/delete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ paths })
-        });
+        try {
+            if (!confirm(`Delete ${app.state.selectedFiles.size} files?`)) return;
 
-        // #5: Parse detailed response
-        const data = await res.json().catch(() => null);
-        if (data) {
-            const ok = (data.success || []).length;
-            const fail = (data.failed || []).length;
-            if (ok > 0) this.showToast(`Deleted ${ok} file(s)`, 'success');
-            if (fail > 0) this.showToast(`${fail} file(s) failed to delete`, 'error');
+            const paths = Array.from(app.state.selectedFiles);
+
+            // Windows File Lock Fix: Remove elements from DOM and clear src to release browser locks
+            app.state.selectedFiles.forEach(fileName => {
+                const el = document.querySelector(`.grid-item[data-file-name="${CSS.escape(fileName)}"]`);
+                if (el) {
+                    const media = el.querySelector('video, img');
+                    if (media) {
+                        media.pause && media.pause();
+                        media.removeAttribute('src'); 
+                        media.load && media.load(); // Force video lock release
+                    }
+                    el.remove();
+                }
+            });
+
+            // Wait a moment for the browser to completely release file handles
+            await new Promise(r => setTimeout(r, 200));
+
+            const res = await fetch('/api/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ paths })
+            });
+
+            const data = await res.json().catch(() => null);
+            if (data) {
+                const ok = (data.success || []).length;
+                const fail = (data.failed || []).length;
+                if (ok > 0) this.showToast(`Deleted ${ok} file(s)`, 'success');
+                if (fail > 0) {
+                    this.showToast(`${fail} file(s) failed to delete`, 'error');
+                    console.error("Delete failures:", data.failed);
+                }
+            }
+
+            app.state.selectedFiles.clear();
+            app.main.init(); // Reload
+        } finally {
+            setTimeout(() => { app.state.isDeleting = false; }, 500);
         }
-
-        app.state.selectedFiles.clear();
-        app.main.init(); // Reload
     },
 
     // --- Move & Folder Logic ---

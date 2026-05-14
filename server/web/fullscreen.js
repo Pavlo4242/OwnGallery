@@ -170,6 +170,21 @@ app.fullscreen = {
         if (!fileName) return;
         if (!confirm(`Delete "${s.MEDIA_DATA[fileName]?.name}"?`)) return;
 
+        // Windows File Lock Fix: clear the fullscreen player
+        const content = document.querySelector('.fullscreen-content');
+        if (content) {
+            const media = content.querySelector('video, img');
+            if (media) {
+                media.pause && media.pause();
+                media.removeAttribute('src');
+                media.load && media.load();
+            }
+            content.innerHTML = '';
+        }
+
+        // Wait a moment for the browser to completely release file handles
+        await new Promise(r => setTimeout(r, 200));
+
         const res = await fetch('/api/delete', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -181,17 +196,22 @@ app.fullscreen = {
             app.utils.showToast('Deleted file', 'success');
             // Navigate to next image or close if last
             const nextIdx = s.currentMediaIndex;
-            this.close();
             // Remove from data
             delete s.MEDIA_DATA[fileName];
             s.allMediaFiles = s.allMediaFiles.filter(f => f !== fileName);
             if (s.allMediaFiles.length > 0) {
                 const safeIdx = Math.min(nextIdx, s.allMediaFiles.length - 1);
                 this.open(s.allMediaFiles[safeIdx]);
+            } else {
+                this.close();
+                app.main.init();
             }
             app.gallery.updateCounter();
         } else {
             app.utils.showToast('Delete failed', 'error');
+            console.error("Delete failures:", data?.failed);
+            // Re-open since it failed
+            this.open(fileName);
         }
     }
 };
