@@ -197,7 +197,41 @@
         </div>
     </div>
 
-    
+    <!-- #8: Toast Notification Container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- #9: Keyboard Help Overlay -->
+    <div id="helpOverlay" class="help-overlay" style="display:none;" onclick="this.style.display='none'">
+        <div class="help-content" onclick="event.stopPropagation()">
+            <h2>⌨️ Keyboard Shortcuts</h2>
+            <div class="help-columns">
+                <div class="help-col">
+                    <h3>Grid Navigation</h3>
+                    <div class="help-row"><kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> Navigate</div>
+                    <div class="help-row"><kbd>Enter</kbd> Open focused item</div>
+                    <div class="help-row"><kbd>Space</kbd> Toggle selection (multi-select)</div>
+                </div>
+                <div class="help-col">
+                    <h3>Actions</h3>
+                    <div class="help-row"><kbd>M</kbd> Toggle Multi-Select</div>
+                    <div class="help-row"><kbd>Delete</kbd> Delete selected</div>
+                    <div class="help-row"><kbd>S</kbd> Shuffle view</div>
+                    <div class="help-row"><kbd>F</kbd> Filter favorites</div>
+                    <div class="help-row"><kbd>R</kbd> Refresh gallery</div>
+                    <div class="help-row"><kbd>1</kbd>-<kbd>6</kbd> Sort modes</div>
+                </div>
+                <div class="help-col">
+                    <h3>Fullscreen</h3>
+                    <div class="help-row"><kbd>←</kbd><kbd>→</kbd> Navigate</div>
+                    <div class="help-row"><kbd>Space</kbd> Play/Pause slideshow</div>
+                    <div class="help-row"><kbd>F2</kbd> Rename file</div>
+                    <div class="help-row"><kbd>Esc</kbd> Close</div>
+                </div>
+            </div>
+            <p style="text-align:center; color:#666; margin-top:20px;">Press <kbd>?</kbd> or click outside to close</p>
+        </div>
+    </div>
+
     <!-- Dependencies -->
     <script src="masonry.pkgd.min.js"></script>
     <script src="imagesloaded.pkgd.min.js"></script>

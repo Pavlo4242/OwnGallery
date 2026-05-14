@@ -7,6 +7,7 @@
  */
 
 
+
 app.fullscreen = {
     open(fileName) {
         const s = app.state;
@@ -14,6 +15,7 @@ app.fullscreen = {
         
         s.currentMediaIndex = s.allMediaFiles.indexOf(fileName);
         if (s.currentMediaIndex === -1) return;
+        s._currentFullscreenFile = fileName; // #13: Track for rename
 
         const overlay = document.getElementById('fullscreenOverlay');
         const content = overlay.querySelector('.fullscreen-content');
@@ -21,16 +23,37 @@ app.fullscreen = {
 
         // Content Creation
         content.innerHTML = '';
-        const mediaEl = app.media.createElement(fileName);
-        if(info.isVideo) {
+        let mediaEl;
+        if (info.isVideo) {
+            mediaEl = document.createElement('video');
+            mediaEl.src = info.url;
             mediaEl.controls = true;
             mediaEl.autoplay = true;
+        } else {
+            // Fullscreen: load full-res directly (not lazy)
+            mediaEl = document.createElement('img');
+            mediaEl.src = info.url;
         }
         content.appendChild(mediaEl);
 
         // Update Info
         document.querySelector('.media-filename').textContent = info.name;
         document.querySelector('.media-counter').textContent = `${s.currentMediaIndex + 1} / ${s.allMediaFiles.length}`;
+
+        // #12: Show dimensions and file size
+        const metaEl = document.querySelector('.media-meta') || (() => {
+            const el = document.createElement('div');
+            el.className = 'media-meta';
+            document.querySelector('.media-info').appendChild(el);
+            return el;
+        })();
+        const sizeStr = info.size ? this.formatFileSize(info.size) : '';
+        metaEl.textContent = sizeStr;
+        if (!info.isVideo && mediaEl.tagName === 'IMG') {
+            mediaEl.onload = () => {
+                metaEl.textContent = `${mediaEl.naturalWidth} × ${mediaEl.naturalHeight}  •  ${sizeStr}`;
+            };
+        }
 
         // Sync Select Dropdown
         const dir = fileName.split('/').slice(0, -1).join('/') || 'Root';
@@ -102,5 +125,40 @@ app.fullscreen = {
         const pct = (e.clientY - bar.getBoundingClientRect().top) / bar.offsetHeight;
         const index = Math.floor(pct * app.state.allMediaFiles.length);
         this.open(app.state.allMediaFiles[index]);
+    },
+
+    // #12: Human-readable file size
+    formatFileSize(bytes) {
+        if (!bytes) return '';
+        const units = ['B', 'KB', 'MB', 'GB'];
+        let i = 0;
+        let size = bytes;
+        while (size >= 1024 && i < units.length - 1) { size /= 1024; i++; }
+        return `${size.toFixed(i > 0 ? 1 : 0)} ${units[i]}`;
+    },
+
+    // #13: Rename current file
+    async renameCurrentFile() {
+        const s = app.state;
+        const fileName = s._currentFullscreenFile;
+        if (!fileName) return;
+        const info = s.MEDIA_DATA[fileName];
+        if (!info) return;
+
+        const newName = prompt('Rename file:', info.name);
+        if (!newName || newName === info.name) return;
+
+        const res = await fetch('/api/rename', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: fileName, newName })
+        });
+
+        if (res.ok) {
+            app.fullscreen.close();
+            app.main.init();
+        } else {
+            alert('Rename failed: ' + (await res.text()));
+        }
     }
 };

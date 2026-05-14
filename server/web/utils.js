@@ -85,15 +85,36 @@ app.utils = {
         const countMove = document.getElementById('selectedCountMove');
         if (countMove) countMove.textContent = app.state.selectedFiles.size;
     },
+    // #8: Toast notification system
+    showToast(message, type = 'info') {
+        const container = document.getElementById('toastContainer');
+        if (!container) return;
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        toast.textContent = message;
+        container.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+    },
+
     async deleteSelected() {
-        if (app.state.selectedFiles.size === 0 || !confirm(`Delete ${app.state.selectedFiles.size} files?`)) return;
+        if (app.state.selectedFiles.size === 0) return;
+        if (!confirm(`Delete ${app.state.selectedFiles.size} files?`)) return;
 
         const paths = Array.from(app.state.selectedFiles);
-        await fetch('/api/delete', {
+        const res = await fetch('/api/delete', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ paths })
         });
+
+        // #5: Parse detailed response
+        const data = await res.json().catch(() => null);
+        if (data) {
+            const ok = (data.success || []).length;
+            const fail = (data.failed || []).length;
+            if (ok > 0) this.showToast(`Deleted ${ok} file(s)`, 'success');
+            if (fail > 0) this.showToast(`${fail} file(s) failed to delete`, 'error');
+        }
 
         app.state.selectedFiles.clear();
         app.main.init(); // Reload
@@ -179,18 +200,28 @@ app.utils = {
         }
 
         if (isCreateOnly) {
-            await fetch('/api/mkdir', {
+            const res = await fetch('/api/mkdir', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ path: targetFolder })
             });
+            if (res.ok) this.showToast(`Created folder: ${targetFolder}`, 'success');
+            else this.showToast('Failed to create folder', 'error');
         } else {
             const paths = Array.from(app.state.selectedFiles);
-            await fetch('/api/move', {
+            const res = await fetch('/api/move', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ paths, target: targetFolder })
             });
+            // #5: Parse detailed response
+            const data = await res.json().catch(() => null);
+            if (data) {
+                const ok = (data.success || []).length;
+                const fail = (data.failed || []).length;
+                if (ok > 0) this.showToast(`Moved ${ok} file(s) to ${targetFolder}`, 'success');
+                if (fail > 0) this.showToast(`${fail} file(s) failed to move`, 'error');
+            }
             app.state.selectedFiles.clear();
         }
 
@@ -216,6 +247,8 @@ app.utils = {
             if (saved.sortBy) s.sortBy = saved.sortBy;
             const sortFilter = document.getElementById('sortFilter');
             if (sortFilter && saved.sortBy) sortFilter.value = saved.sortBy;
+            // #10: Restore current folder
+            if (saved.currentFolder) app.state._pendingFolder = saved.currentFolder;
         }
         const favs = localStorage.getItem('favoriteFiles');
         if (favs) s.favoriteFiles = new Set(JSON.parse(favs));
@@ -228,7 +261,8 @@ app.utils = {
             slideshowShuffle: app.state.slideshowShuffle,
             quickPreview: app.state.quickPreviewEnabled,
             viewMode: app.state.viewMode,
-            sortBy: app.state.sortBy
+            sortBy: app.state.sortBy,
+            currentFolder: document.getElementById('folderFilter').value // #10
         };
         localStorage.setItem('gallerySettings', JSON.stringify(settings));
         localStorage.setItem('favoriteFiles', JSON.stringify(Array.from(app.state.favoriteFiles)));

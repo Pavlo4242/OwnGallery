@@ -11,14 +11,11 @@ app.media = {
             el.src = info.url;
             el.preload = 'metadata'; 
         } else {
+            // #7: Lazy-load ALL image formats via IntersectionObserver
             el = document.createElement('img');
             el.loading = 'lazy';
-            if (fileName.toLowerCase().endsWith('.webp')) {
-                el.dataset.src = info.url;
-                if (app.state.animObserver) app.state.animObserver.observe(el);
-            } else {
-                el.src = info.url;
-            }
+            el.dataset.src = info.url;
+            if (app.state.animObserver) app.state.animObserver.observe(el);
         }
         return el;
     },
@@ -99,6 +96,20 @@ app.media = {
             };
                 item.onmouseleave = () => { app.state.hoveredMedia = null; app.media.managePlayback(); app.utils.hideQuickPreview(); };
             }
+
+            // #11: Drag-and-drop support
+            item.draggable = true;
+            item.ondragstart = (e) => {
+                // If multi-select is on and this item is selected, drag all selected
+                if (app.state.multiSelectMode && app.state.selectedFiles.size > 0) {
+                    e.dataTransfer.setData('text/plain', JSON.stringify(Array.from(app.state.selectedFiles)));
+                } else {
+                    e.dataTransfer.setData('text/plain', JSON.stringify([fileName]));
+                }
+                item.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+            };
+            item.ondragend = () => { item.classList.remove('dragging'); };
 
             return item;
         });

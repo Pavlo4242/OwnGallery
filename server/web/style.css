@@ -956,3 +956,129 @@ body {
     box-shadow: 0 12px 24px rgba(33, 150, 243, 0.4);
     z-index: 15;
 }
+
+/* #8: Toast Notifications */
+.toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+}
+
+.toast {
+    padding: 12px 20px;
+    border-radius: 10px;
+    color: white;
+    font-size: 14px;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    animation: toastIn 0.3s ease-out, toastOut 0.3s ease-in 2.7s forwards;
+    pointer-events: auto;
+    max-width: 350px;
+}
+
+.toast-success { background: rgba(76, 175, 80, 0.9); }
+.toast-error { background: rgba(244, 67, 54, 0.9); }
+.toast-info { background: rgba(33, 150, 243, 0.9); }
+.toast-warning { background: rgba(255, 152, 0, 0.9); }
+
+@keyframes toastIn {
+    from { opacity: 0; transform: translateX(40px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes toastOut {
+    from { opacity: 1; transform: translateX(0); }
+    to { opacity: 0; transform: translateX(40px); }
+}
+
+/* #9: Help Overlay */
+.help-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.85);
+    z-index: 10000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    backdrop-filter: blur(8px);
+}
+
+.help-content {
+    background: #1e1e1e;
+    border: 1px solid #3a3a3a;
+    border-radius: 16px;
+    padding: 30px 40px;
+    max-width: 800px;
+    width: 90vw;
+    color: #e0e0e0;
+}
+
+.help-content h2 {
+    text-align: center;
+    margin-bottom: 20px;
+    color: #fff;
+}
+
+.help-columns {
+    display: flex;
+    gap: 30px;
+    flex-wrap: wrap;
+}
+
+.help-col {
+    flex: 1;
+    min-width: 200px;
+}
+
+.help-col h3 {
+    color: #4CAF50;
+    margin-bottom: 12px;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.help-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-size: 13px;
+}
+
+kbd {
+    background: #333;
+    border: 1px solid #555;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-family: monospace;
+    font-size: 12px;
+    color: #fff;
+    min-width: 24px;
+    text-align: center;
+}
+
+/* #12: Fullscreen metadata */
+.media-meta {
+    font-size: 12px;
+    color: #888;
+    margin-top: 2px;
+}
+
+/* #11: Drag-and-drop visual states */
+.grid-item.dragging {
+    opacity: 0.4;
+    transform: scale(0.95);
+}
+
+.folder-card.drag-over {
+    border-color: #4CAF50 !important;
+    background: rgba(76, 175, 80, 0.2) !important;
+    box-shadow: 0 0 20px rgba(76, 175, 80, 0.4);
+    transform: scale(1.05);
+}

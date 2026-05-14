@@ -26,6 +26,11 @@ app.main = {
             });
 
             app.gallery.populateDropdowns();
+            // #10: Restore saved folder if it still exists
+            if (app.state._pendingFolder && app.state.FOLDER_MAP[app.state._pendingFolder]) {
+                document.getElementById('folderFilter').value = app.state._pendingFolder;
+            }
+            delete app.state._pendingFolder;
             app.gallery.filterByFolder(true);
         } catch (e) {
             grid.innerHTML = `<div class="loading">Error: ${e.message}</div>`;
@@ -112,6 +117,7 @@ app.main = {
                 if (e.key === 'ArrowLeft') app.fullscreen.navigate(-1);
                 if (e.key === 'Escape') app.fullscreen.close();
                 if (e.key === ' ') { e.preventDefault(); app.fullscreen.toggleSlideshow(); }
+                if (e.key === 'F2') app.fullscreen.renameCurrentFile(); // #13
                 return;
             }
 
@@ -155,6 +161,11 @@ app.main = {
                     sortSelect.selectedIndex = parseInt(e.key) - 1;
                     app.gallery.handleSortChange();
                 }
+            }
+            // #9: Help overlay
+            if (e.key === '?') {
+                const help = document.getElementById('helpOverlay');
+                if (help) help.style.display = help.style.display === 'flex' ? 'none' : 'flex';
             }
         });
         

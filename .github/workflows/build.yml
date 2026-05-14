@@ -2,11 +2,11 @@ name: Build Media Gallery Launcher
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ main ]
-    tags: [ 'v*' ]
-  pull_request:
-    branches: [ main ]
+  
+  
+  
+  #pull_request:
+    #branches: [ main ]
   
 
 jobs:
@@ -20,6 +20,10 @@ jobs:
             goos: windows
             goarch: amd64
             platform: windows-amd64
+          - os: windows-latest
+            goos: windows
+            goarch: arm64
+            platform: windows-arm64
 
     steps:
       - name: Checkout code
@@ -30,7 +34,16 @@ jobs:
         with:
           go-version: '1.21'
           cache: true
-          cache-dependency-path: server/go.sum
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
 
       - name: Install dependencies
         run: |
@@ -65,6 +78,9 @@ jobs:
           - platform: windows-amd64
             output: MediaGallery.exe
             goarch: amd64
+          - platform: windows-arm64
+            output: MediaGallery-arm64.exe
+            goarch: arm64
 
     steps:
       - name: Checkout code
@@ -181,6 +197,7 @@ jobs:
             
             ### 📥 Downloads
             - **Windows (x64)**: MediaGallery.exe
+            - **Windows (ARM64)**: MediaGallery-arm64.exe
             
             ### ✨ Features
             - 🚀 Single executable - no installation needed

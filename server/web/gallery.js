@@ -34,6 +34,7 @@ app.gallery = {
         app.media.appendBatch(s.allMediaFiles.slice(0, s.filesPerLoad));
         s.loadedMediaCount += s.filesPerLoad;
         this.updateCounter();
+        app.utils.saveSettings(); // #10: Persist folder
     },
 
     renderSubfolders(currentFolder) {
@@ -56,6 +57,32 @@ app.gallery = {
                 document.getElementById('folderFilter').value = dir;
                 this.filterByFolder(true);
             };
+
+            // #11: Drop target for drag-and-drop file moving
+            card.ondragover = (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; card.classList.add('drag-over'); };
+            card.ondragleave = () => { card.classList.remove('drag-over'); };
+            card.ondrop = async (e) => {
+                e.preventDefault();
+                card.classList.remove('drag-over');
+                try {
+                    const paths = JSON.parse(e.dataTransfer.getData('text/plain'));
+                    if (!paths || paths.length === 0) return;
+                    const res = await fetch('/api/move', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ paths, target: dir })
+                    });
+                    const data = await res.json().catch(() => null);
+                    if (data) {
+                        const ok = (data.success || []).length;
+                        if (ok > 0) app.utils.showToast(`Moved ${ok} file(s) to ${dir.split('/').pop()}`, 'success');
+                        if ((data.failed || []).length > 0) app.utils.showToast('Some files failed to move', 'error');
+                    }
+                    app.state.selectedFiles.clear();
+                    app.main.init();
+                } catch (err) { console.error('Drop error:', err); }
+            };
+
             grid.appendChild(card);
         });
     },

@@ -117,8 +117,8 @@ func main() {
 	server := &http.Server{
 		Addr:         ":" + port,
 		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
+		WriteTimeout: 5 * time.Minute, // #2: Large media files need time to stream
+		IdleTimeout:  120 * time.Second,
 		TLSConfig: &tls.Config{
 			Certificates: []tls.Certificate{cert},
 			MinVersion:   tls.VersionTLS12,
@@ -261,19 +261,34 @@ func setupRoutes(mediaDir string) {
 			return
 		}
 
+		// #5: Return detailed results
+		type result struct {
+			Path  string `json:"path"`
+			Error string `json:"error,omitempty"`
+		}
+		var succeeded []string
+		var failed []result
+
 		for _, p := range req.Paths {
 			targetPath := filepath.Join(mediaDir, p)
 			if !strings.HasPrefix(filepath.Clean(targetPath), filepath.Clean(mediaDir)) {
-				continue // Skip invalid paths
+				failed = append(failed, result{Path: p, Error: "invalid path"})
+				continue
 			}
 			if err := os.Remove(targetPath); err != nil {
 				log.Printf("Error deleting file %s: %v", targetPath, err)
+				failed = append(failed, result{Path: p, Error: err.Error()})
 			} else {
 				log.Printf("Deleted file: %s", targetPath)
+				succeeded = append(succeeded, p)
 			}
 		}
-		
-		w.WriteHeader(http.StatusOK)
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": succeeded,
+			"failed":  failed,
+		})
 	})
 
 	http.HandleFunc("/api/move", func(w http.ResponseWriter, r *http.Request) {
@@ -301,20 +316,35 @@ func setupRoutes(mediaDir string) {
 		// Create target dir if it doesn't exist
 		os.MkdirAll(targetDir, 0755)
 
+		// #5: Return detailed results
+		type result struct {
+			Path  string `json:"path"`
+			Error string `json:"error,omitempty"`
+		}
+		var succeeded []string
+		var failed []result
+
 		for _, p := range req.Paths {
 			sourcePath := filepath.Join(mediaDir, p)
 			if !strings.HasPrefix(filepath.Clean(sourcePath), filepath.Clean(mediaDir)) {
+				failed = append(failed, result{Path: p, Error: "invalid path"})
 				continue
 			}
 			destPath := filepath.Join(targetDir, filepath.Base(p))
 			if err := os.Rename(sourcePath, destPath); err != nil {
 				log.Printf("Error moving file %s to %s: %v", sourcePath, destPath, err)
+				failed = append(failed, result{Path: p, Error: err.Error()})
 			} else {
 				log.Printf("Moved file: %s -> %s", sourcePath, destPath)
+				succeeded = append(succeeded, p)
 			}
 		}
-		
-		w.WriteHeader(http.StatusOK)
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": succeeded,
+			"failed":  failed,
+		})
 	})
 
 	http.HandleFunc("/api/mkdir", func(w http.ResponseWriter, r *http.Request) {
@@ -348,17 +378,58 @@ func setupRoutes(mediaDir string) {
 		w.WriteHeader(http.StatusOK)
 	})
 
+	// #13: Rename endpoint
+	http.HandleFunc("/api/rename", func(w http.ResponseWriter, r *http.Request) {
+		updateActivity()
+		if r.Method != "POST" {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var req struct {
+			Path    string `json:"path"`
+			NewName string `json:"newName"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		oldPath := filepath.Join(mediaDir, req.Path)
+		if !strings.HasPrefix(filepath.Clean(oldPath), filepath.Clean(mediaDir)) {
+			http.Error(w, "Invalid path", http.StatusForbidden)
+			return
+		}
+
+		newPath := filepath.Join(filepath.Dir(oldPath), req.NewName)
+		if !strings.HasPrefix(filepath.Clean(newPath), filepath.Clean(mediaDir)) {
+			http.Error(w, "Invalid new name", http.StatusForbidden)
+			return
+		}
+
+		if err := os.Rename(oldPath, newPath); err != nil {
+			log.Printf("Error renaming %s to %s: %v", oldPath, newPath, err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		log.Printf("Renamed: %s -> %s", oldPath, newPath)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	})
+
+	// #4: Graceful quit via shutdown channel
 	http.HandleFunc("/api/quit", func(w http.ResponseWriter, r *http.Request) {
-        if r.Method != "POST" {
-            http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-            return
-        }
-        w.Write([]byte("Server shutting down..."))
-        go func() {
-            time.Sleep(500 * time.Millisecond)
-            os.Exit(0)
-        }()
-    })
+		if r.Method != "POST" {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		w.Write([]byte("Server shutting down..."))
+		go func() {
+			time.Sleep(500 * time.Millisecond)
+			shutdownSignal <- true
+		}()
+	})
 }
 
 func getDetailedFileListAndFolders(dir string) ([]FileInfo, []string, error) {
@@ -381,8 +452,12 @@ func getDetailedFileListAndFolders(dir string) ([]FileInfo, []string, error) {
             return nil
         }
 
-        if strings.HasPrefix(info.Name(), ".") { // Skip hidden files/folders
-            return nil // Skip hidden files
+        // #6: Skip hidden files AND directories properly
+        if strings.HasPrefix(info.Name(), ".") {
+            if info.IsDir() {
+                return filepath.SkipDir // Skip entire hidden directory tree
+            }
+            return nil // Skip hidden file
         }
 
         // If it's a directory, add its relative path to the list
@@ -471,12 +546,21 @@ func generateOrLoadCertificate() (tls.Certificate, error) {
 	return tls.X509KeyPair(certPEM, keyPEM)
 }
 
+// #3: Separate cache headers for API vs media
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-		w.Header().Set("Cache-Control", "public, max-age=3600")
+
+		// API responses should never be cached; media files can be
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		} else if strings.HasPrefix(r.URL.Path, "/media/") {
+			w.Header().Set("Cache-Control", "public, max-age=86400")
+		} else {
+			w.Header().Set("Cache-Control", "public, max-age=3600")
+		}
 
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusOK)
