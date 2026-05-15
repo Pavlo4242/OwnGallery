@@ -77,8 +77,18 @@ app.main = {
 
         // UI Inputs
         document.getElementById('thumbnailWidth').addEventListener('input', (e) => {
-             document.querySelectorAll('.grid-item').forEach(el => el.style.width = `${e.target.value}px`);
-             if(app.state.masonry) app.state.masonry.layout();
+             const width = parseInt(e.target.value);
+             const gutter = app.media.getDynamicGutter(width);
+
+             document.querySelectorAll('.grid-item').forEach(el => {
+                 el.style.width = `${width}px`;
+                 el.style.marginBottom = `${gutter}px`;
+             });
+             if(app.state.masonry) {
+                 app.state.masonry.options.columnWidth = width;
+                 app.state.masonry.options.gutter = gutter;
+                 app.state.masonry.layout();
+             }
              app.utils.saveSettings();
         });
 
@@ -119,7 +129,8 @@ app.main = {
                 if (e.key === 'ArrowRight') app.fullscreen.navigate(1);
                 if (e.key === 'ArrowLeft') app.fullscreen.navigate(-1);
                 if (e.key === 'Escape') app.fullscreen.close();
-                if (e.key === ' ') { e.preventDefault(); app.fullscreen.toggleSlideshow(); }
+                if (e.key === ' ') { e.preventDefault(); app.fullscreen.markForDeletion(); }
+                if (e.key === 'p' || e.key === 'P') { e.preventDefault(); app.fullscreen.toggleSlideshow(); }
                 if (e.key === 'F2') app.fullscreen.renameCurrentFile(); // #13
                 if (e.key === 'Delete') app.fullscreen.deleteCurrentFile(); // Delete in fullscreen
                 return;

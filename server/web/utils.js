@@ -133,7 +133,8 @@ app.utils = {
         app.state.isDeleting = true;
 
         try {
-            if (!confirm(`Delete ${app.state.selectedFiles.size} files?`)) return;
+            // Disabled delete confirmation for multi-select as requested
+            // if (!confirm(`Delete ${app.state.selectedFiles.size} files?`)) return;
 
             const paths = Array.from(app.state.selectedFiles);
 

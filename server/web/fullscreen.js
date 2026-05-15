@@ -163,55 +163,90 @@ app.fullscreen = {
         }
     },
 
-    // Delete current fullscreen file
-    async deleteCurrentFile() {
+    // Mark current fullscreen file for deletion and advance
+    markForDeletion() {
         const s = app.state;
         const fileName = s._currentFullscreenFile;
         if (!fileName) return;
-        if (!confirm(`Delete "${s.MEDIA_DATA[fileName]?.name}"?`)) return;
 
-        // Windows File Lock Fix: clear the fullscreen player
-        const content = document.querySelector('.fullscreen-content');
-        if (content) {
-            const media = content.querySelector('video, img');
-            if (media) {
-                media.pause && media.pause();
-                media.removeAttribute('src');
-                media.load && media.load();
-            }
-            content.innerHTML = '';
+        // Auto-enable multi-select if not already on
+        if (!s.multiSelectMode) {
+            app.utils.toggleMultiSelect();
         }
 
-        // Wait a moment for the browser to completely release file handles
-        await new Promise(r => setTimeout(r, 200));
+        // Add to selected files
+        s.selectedFiles.add(fileName);
 
-        const res = await fetch('/api/delete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ paths: [fileName] })
-        });
+        // Update grid item visually (even if behind the overlay)
+        const itemDom = document.querySelector(`.grid-item[data-file-name="${CSS.escape(fileName)}"]`);
+        if (itemDom) {
+            itemDom.classList.add('selected');
+            const cb = itemDom.querySelector('input[type="checkbox"]');
+            if (cb) cb.checked = true;
+        }
+        app.utils.updateDeleteBtn();
+        app.utils.showToast('Marked for deletion', 'info');
 
-        const data = await res.json().catch(() => null);
-        if (data && (data.success || []).length > 0) {
-            app.utils.showToast('Deleted file', 'success');
-            // Navigate to next image or close if last
-            const nextIdx = s.currentMediaIndex;
-            // Remove from data
-            delete s.MEDIA_DATA[fileName];
-            s.allMediaFiles = s.allMediaFiles.filter(f => f !== fileName);
-            if (s.allMediaFiles.length > 0) {
-                const safeIdx = Math.min(nextIdx, s.allMediaFiles.length - 1);
-                this.open(s.allMediaFiles[safeIdx]);
-            } else {
-                this.close();
-                app.main.init();
+        // Auto advance
+        this.navigate(1);
+    },
+
+    // Delete current fullscreen file
+    async deleteCurrentFile() {
+        const s = app.state;
+        if (s.isDeleting) return; // Prevent popup spam
+        s.isDeleting = true;
+
+        try {
+            const fileName = s._currentFullscreenFile;
+            if (!fileName) return;
+            if (!confirm(`Delete "${s.MEDIA_DATA[fileName]?.name}"?`)) return;
+
+            // Windows File Lock Fix: clear the fullscreen player
+            const content = document.querySelector('.fullscreen-content');
+            if (content) {
+                const media = content.querySelector('video, img');
+                if (media) {
+                    media.pause && media.pause();
+                    media.removeAttribute('src');
+                    media.load && media.load();
+                }
+                content.innerHTML = '';
             }
-            app.gallery.updateCounter();
-        } else {
-            app.utils.showToast('Delete failed', 'error');
-            console.error("Delete failures:", data?.failed);
-            // Re-open since it failed
-            this.open(fileName);
+
+            // Wait a moment for the browser to completely release file handles
+            await new Promise(r => setTimeout(r, 200));
+
+            const res = await fetch('/api/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ paths: [fileName] })
+            });
+
+            const data = await res.json().catch(() => null);
+            if (data && (data.success || []).length > 0) {
+                app.utils.showToast('Deleted file', 'success');
+                // Navigate to next image or close if last
+                const nextIdx = s.currentMediaIndex;
+                // Remove from data
+                delete s.MEDIA_DATA[fileName];
+                s.allMediaFiles = s.allMediaFiles.filter(f => f !== fileName);
+                if (s.allMediaFiles.length > 0) {
+                    const safeIdx = Math.min(nextIdx, s.allMediaFiles.length - 1);
+                    this.open(s.allMediaFiles[safeIdx]);
+                } else {
+                    this.close();
+                    app.main.init();
+                }
+                app.gallery.updateCounter();
+            } else {
+                app.utils.showToast('Delete failed', 'error');
+                console.error("Delete failures:", data?.failed);
+                // Re-open since it failed
+                this.open(fileName);
+            }
+        } finally {
+            setTimeout(() => { s.isDeleting = false; }, 500);
         }
     }
 };

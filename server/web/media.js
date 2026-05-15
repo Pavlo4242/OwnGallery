@@ -20,10 +20,16 @@ app.media = {
         return el;
     },
 
+    // Calculate dynamic gutter size based on thumbnail width
+    getDynamicGutter(width) {
+        return Math.max(2, 25 - ((width - 150) / 650) * 23);
+    },
+
     // Render Batch
     appendBatch(files) {
         const grid = document.querySelector('.grid');
-        const width = document.getElementById('thumbnailWidth').value;
+        const width = parseInt(document.getElementById('thumbnailWidth').value) || 250;
+        const gutter = this.getDynamicGutter(width);
         const isListView = app.state.viewMode === 'list';
 
         // Toggle Grid/List Class
@@ -41,7 +47,10 @@ app.media = {
             
             const item = document.createElement('div');
             item.className = isListView ? 'list-item' : 'grid-item';
-            if (!isListView) item.style.width = `${width}px`;
+            if (!isListView) {
+                item.style.width = `${width}px`;
+                item.style.marginBottom = `${gutter}px`;
+            }
             if (isSelected) item.classList.add('selected');
             item.dataset.fileName = fileName; // Store for keyboard/drag access
 
@@ -148,12 +157,14 @@ app.media = {
         if (idx === -1 || idx >= folders.length - 1) return;
 
         const nextFolder = folders[idx + 1];
-        const width = document.getElementById('thumbnailWidth').value;
+        const width = parseInt(document.getElementById('thumbnailWidth').value) || 250;
+        const gutter = this.getDynamicGutter(width);
         const grid = document.querySelector('.grid');
 
         const card = document.createElement('div');
         card.className = 'grid-item folder-card next-folder-card';
         card.style.width = `${width}px`;
+        card.style.marginBottom = `${gutter}px`;
         card.innerHTML = `<div class="folder-icon">➡️</div><div>Next: ${nextFolder.split('/').pop()}</div>`;
         card.onclick = () => {
             document.getElementById('folderFilter').value = nextFolder;
@@ -175,10 +186,13 @@ app.media = {
             return;
         }
         
+        const width = parseInt(document.getElementById('thumbnailWidth').value) || 250;
+        const gutter = this.getDynamicGutter(width);
+
         app.state.masonry = new Masonry(grid, {
             itemSelector: '.grid-item',
-            columnWidth: parseInt(document.getElementById('thumbnailWidth').value),
-            gutter: 15,
+            columnWidth: width,
+            gutter: gutter,
             fitWidth: true
         });
     },
