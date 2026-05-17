@@ -20,6 +20,7 @@ app.fullscreen = {
         if (panel && panel.style.display === 'block') panel.style.display = 'none';
 
         s._currentFullscreenFile = fileName; // #13: Track for rename
+        this.updateMarkStatus();
 
         const overlay = document.getElementById('fullscreenOverlay');
         const content = overlay.querySelector('.fullscreen-content');
@@ -241,32 +242,68 @@ app.fullscreen = {
         }
     },
 
-    // Mark current fullscreen file for deletion and advance
+    // Update the visual status of marked-for-deletion items
+    updateMarkStatus() {
+        const s = app.state;
+        const fileName = s._currentFullscreenFile;
+        const overlay = document.getElementById('fullscreenOverlay');
+        const btn = document.getElementById('markBtn');
+        if (!fileName || !overlay) return;
+
+        const isMarked = s.selectedFiles.has(fileName);
+        if (isMarked) {
+            overlay.classList.add('marked');
+            if (btn) {
+                btn.textContent = '☒ Unmark';
+                btn.style.background = 'rgba(244,67,54,0.3)';
+                btn.style.borderColor = 'rgba(244,67,54,0.5)';
+            }
+        } else {
+            overlay.classList.remove('marked');
+            if (btn) {
+                btn.textContent = '☑ Mark & Next';
+                btn.style.background = 'rgba(76,175,80,0.3)';
+                btn.style.borderColor = 'rgba(76,175,80,0.5)';
+            }
+        }
+    },
+
+    // Toggle mark current fullscreen file for deletion and advance on mark
     markForDeletion() {
         const s = app.state;
         const fileName = s._currentFullscreenFile;
         if (!fileName) return;
 
-        // Auto-enable multi-select if not already on
-        if (!s.multiSelectMode) {
-            app.utils.toggleMultiSelect();
+        if (s.selectedFiles.has(fileName)) {
+            // Unmark
+            s.selectedFiles.delete(fileName);
+            const itemDom = document.querySelector(`.grid-item[data-file-name="${CSS.escape(fileName)}"]`);
+            if (itemDom) {
+                itemDom.classList.remove('selected');
+                const cb = itemDom.querySelector('input[type="checkbox"]');
+                if (cb) cb.checked = false;
+            }
+            app.utils.updateDeleteBtn();
+            app.utils.showToast('Unmarked file', 'info');
+            this.updateMarkStatus();
+        } else {
+            // Mark
+            if (!s.multiSelectMode) {
+                app.utils.toggleMultiSelect();
+            }
+            s.selectedFiles.add(fileName);
+            const itemDom = document.querySelector(`.grid-item[data-file-name="${CSS.escape(fileName)}"]`);
+            if (itemDom) {
+                itemDom.classList.add('selected');
+                const cb = itemDom.querySelector('input[type="checkbox"]');
+                if (cb) cb.checked = true;
+            }
+            app.utils.updateDeleteBtn();
+            app.utils.showToast('Marked for deletion', 'info');
+            this.updateMarkStatus();
+            // Auto advance
+            this.navigate(1);
         }
-
-        // Add to selected files
-        s.selectedFiles.add(fileName);
-
-        // Update grid item visually (even if behind the overlay)
-        const itemDom = document.querySelector(`.grid-item[data-file-name="${CSS.escape(fileName)}"]`);
-        if (itemDom) {
-            itemDom.classList.add('selected');
-            const cb = itemDom.querySelector('input[type="checkbox"]');
-            if (cb) cb.checked = true;
-        }
-        app.utils.updateDeleteBtn();
-        app.utils.showToast('Marked for deletion', 'info');
-
-        // Auto advance
-        this.navigate(1);
     },
 
     // Delete current fullscreen file

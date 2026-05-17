@@ -515,6 +515,28 @@ body {
     padding-bottom: 5px;
 }
 
+.fullscreen-overlay.marked {
+    box-shadow: inset 0 0 100px rgba(244, 67, 54, 0.6) !important;
+}
+
+.fullscreen-overlay.marked::before {
+    content: "⚠️ MARKED FOR DELETION";
+    position: absolute;
+    top: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(244, 67, 54, 0.9);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-weight: bold;
+    font-size: 14px;
+    z-index: 1004;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    letter-spacing: 1px;
+    pointer-events: none;
+}
+
 .playback-controls {
     position: absolute;
     right: 30px;
