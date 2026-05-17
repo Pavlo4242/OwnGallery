@@ -131,6 +131,7 @@ app.main = {
                 if (e.key === 'Escape') app.fullscreen.close();
                 if (e.key === ' ') { e.preventDefault(); app.fullscreen.markForDeletion(); }
                 if (e.key === 'p' || e.key === 'P') { e.preventDefault(); app.fullscreen.toggleSlideshow(); }
+                if (e.key === 'i' || e.key === 'I') { e.preventDefault(); app.fullscreen.toggleExif(); }
                 if (e.key === 'F2') app.fullscreen.renameCurrentFile(); // #13
                 if (e.key === 'Delete') app.fullscreen.deleteCurrentFile(); // Delete in fullscreen
                 return;

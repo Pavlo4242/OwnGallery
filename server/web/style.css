@@ -487,6 +487,34 @@ body {
     text-transform: uppercase;
 }
 
+.exif-panel {
+    position: absolute;
+    top: 30px;
+    left: 30px;
+    width: 400px;
+    max-height: 80vh;
+    background: rgba(0,0,0,0.85);
+    color: #e0e0e0;
+    padding: 20px;
+    border-radius: 12px;
+    overflow-y: auto;
+    z-index: 1005;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.2);
+    font-size: 13px;
+    line-height: 1.4;
+    display: none;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.exif-panel h4 {
+    margin: 0 0 10px 0;
+    color: #4CAF50;
+    border-bottom: 1px solid #333;
+    padding-bottom: 5px;
+}
+
 .playback-controls {
     position: absolute;
     right: 30px;

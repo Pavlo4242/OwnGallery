@@ -15,6 +15,10 @@ app.fullscreen = {
         
         s.currentMediaIndex = s.allMediaFiles.indexOf(fileName);
         if (s.currentMediaIndex === -1) return;
+        // Hide EXIF panel if open
+        const panel = document.getElementById('exifPanel');
+        if (panel && panel.style.display === 'block') panel.style.display = 'none';
+
         s._currentFullscreenFile = fileName; // #13: Track for rename
 
         const overlay = document.getElementById('fullscreenOverlay');
@@ -67,6 +71,9 @@ app.fullscreen = {
     close() {
         document.getElementById('fullscreenOverlay').classList.remove('visible');
         document.querySelector('.fullscreen-content').innerHTML = ''; // Stop video
+        const panel = document.getElementById('exifPanel');
+        if (panel) panel.style.display = 'none';
+        app.state._currentFullscreenFile = null;
         this.stopSlideshow();
     },
 
@@ -160,6 +167,77 @@ app.fullscreen = {
             app.main.init();
         } else {
             app.utils.showToast('Rename failed: ' + (await res.text()), 'error');
+        }
+    },
+
+    // Toggle EXIF / AI Prompt metadata panel
+    async toggleExif() {
+        let panel = document.getElementById('exifPanel');
+        if (!panel) {
+            panel = document.createElement('div');
+            panel.id = 'exifPanel';
+            panel.className = 'exif-panel';
+            document.getElementById('fullscreenOverlay').appendChild(panel);
+        }
+        
+        if (panel.style.display === 'block') {
+            panel.style.display = 'none';
+            return;
+        }
+
+        const fileName = app.state._currentFullscreenFile;
+        if (!fileName) return;
+        const info = app.state.MEDIA_DATA[fileName];
+        panel.style.display = 'block';
+        panel.innerHTML = '<h4>EXIF / Prompt Data</h4>Loading...';
+
+        try {
+            let output = '';
+            
+            // Ultra-lightweight native PNG tEXt/iTXt chunk parser (great for AI Prompts)
+            if (info.url.toLowerCase().endsWith('.png')) {
+                const res = await fetch(info.url);
+                const buf = await res.arrayBuffer();
+                const view = new DataView(buf);
+                if (view.getUint32(0) === 0x89504e47) {
+                    let offset = 8;
+                    const dec = new TextDecoder();
+                    while (offset < view.byteLength) {
+                        const len = view.getUint32(offset);
+                        const type = dec.decode(new Uint8Array(buf, offset + 4, 4));
+                        if (type === 'tEXt' || type === 'iTXt') {
+                            const data = dec.decode(new Uint8Array(buf, offset + 8, len));
+                            const split = data.split('\0');
+                            const key = split[0];
+                            const val = split[split.length - 1]; // iTXt value is at the end
+                            if (key !== 'workflow' && val.length > 2) {
+                                output += `<div style="color:#4CAF50; font-weight:bold; margin-top:10px;">${key}:</div>${val}\n`;
+                            }
+                        }
+                        offset += 8 + len + 4;
+                    }
+                }
+            }
+
+            // Fallback to EXIF library for JPEG/WebP or if PNG had no chunks
+            if (!output) {
+                if (typeof exifr === 'undefined') {
+                    await new Promise(r => {
+                        const s = document.createElement('script');
+                        s.src = 'https://cdn.jsdelivr.net/npm/exifr/dist/lite.umd.js';
+                        s.onload = r;
+                        document.head.appendChild(s);
+                    });
+                }
+                const exifData = await exifr.parse(info.url) || {};
+                for (const [key, val] of Object.entries(exifData)) {
+                    if (typeof val !== 'object') output += `<b style="color:#2196F3;">${key}:</b> ${val}\n`;
+                }
+            }
+
+            panel.innerHTML = '<h4>EXIF / Prompt Data</h4>' + (output || '<i>No metadata found.</i>');
+        } catch (e) {
+            panel.innerHTML = `<h4>EXIF / Prompt Data</h4><i>Error: ${e.message}</i>`;
         }
     },
 
