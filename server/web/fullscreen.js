@@ -202,13 +202,10 @@ app.fullscreen = {
             const info = s.MEDIA_DATA[f];
             if (!info) return;
             const isActive = f === currentFile ? 'active' : '';
-            // Only use thumbnails for images to avoid loading heavy videos unnecessarily
-            const thumbStyle = !info.isVideo ? `background-image: url('${CSS.escape(info.url)}');` : `background: #555; display:flex; align-items:center; justify-content:center; font-size:10px;`;
-            const thumbContent = info.isVideo ? '🎥' : '';
+            const icon = info.isVideo ? '🎥' : '🖼️';
             
             html += `<div class="drawer-item ${isActive}" onclick="app.fullscreen.open('${CSS.escape(f)}')">
-                        <div class="drawer-item-thumb" style="${thumbStyle}">${thumbContent}</div>
-                        <div class="drawer-item-name" title="${info.name}">${info.name}</div>
+                        <div class="drawer-item-name" title="${info.name}">${icon} ${info.name}</div>
                      </div>`;
         });
         

@@ -94,6 +94,12 @@ app.main = {
             }
         });
 
+        // Toggle multi-select on background double click
+        document.addEventListener('dblclick', (e) => {
+            if (e.target.closest('.grid-item') || e.target.closest('.controls') || e.target.closest('.fullscreen-overlay') || e.target.closest('.mode-selector')) return;
+            app.utils.toggleMultiSelect();
+        });
+
         // UI Inputs
         document.getElementById('thumbnailWidth').addEventListener('input', (e) => {
              const width = parseInt(e.target.value);

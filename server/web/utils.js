@@ -56,9 +56,13 @@ app.utils = {
         app.state.multiSelectMode = !app.state.multiSelectMode;
         const isOn = app.state.multiSelectMode;
         
-        // Update button text
+        // Update button text and style
         const btn = document.getElementById('multiSelectToggle');
-        if (btn) btn.textContent = isOn ? '☑ Multi-Select ON' : '☑ Multi-Select';
+        if (btn) {
+            btn.textContent = isOn ? '☑ Multi-Select ON' : '☑ Multi-Select';
+            btn.style.background = isOn ? 'rgba(33,150,243,0.4)' : '';
+            btn.style.borderColor = isOn ? 'rgba(33,150,243,0.6)' : '';
+        }
 
         // Patch existing grid items: add or remove checkboxes WITHOUT re-rendering
         document.querySelectorAll('.grid-item:not(.folder-card)').forEach(item => {
@@ -79,14 +83,14 @@ app.utils = {
                 // Remove checkbox
                 const cb = item.querySelector('.grid-item-checkbox');
                 if (cb) cb.remove();
-                item.classList.remove('selected');
+                if (!app.state.selectedFiles.has(fileName)) {
+                    item.classList.remove('selected');
+                }
             }
         });
 
-        if (!isOn) {
-            app.state.selectedFiles.clear();
-            this.updateDeleteBtn();
-        }
+        // We no longer clear app.state.selectedFiles when turning off multi-select
+        this.updateDeleteBtn();
     },
     toggleSelection(fileName, itemDom, isChecked) {
         // Resolve fileName from DOM if not provided (keyboard shortcut path)
