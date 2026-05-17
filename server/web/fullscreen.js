@@ -21,6 +21,8 @@ app.fullscreen = {
 
         s._currentFullscreenFile = fileName; // #13: Track for rename
         this.updateMarkStatus();
+        const drawer = document.getElementById('fsFileDrawer');
+        if (drawer && drawer.classList.contains('open')) this.populateDrawer();
 
         const overlay = document.getElementById('fullscreenOverlay');
         const content = overlay.querySelector('.fullscreen-content');
@@ -171,6 +173,54 @@ app.fullscreen = {
         }
     },
 
+    // --- File List Drawer ---
+    toggleDrawer() {
+        const drawer = document.getElementById('fsFileDrawer');
+        if (!drawer) return;
+        if (drawer.classList.contains('open')) {
+            drawer.classList.remove('open');
+        } else {
+            drawer.classList.add('open');
+            this.populateDrawer();
+        }
+    },
+
+    populateDrawer() {
+        const content = document.getElementById('fsDrawerContent');
+        if (!content) return;
+        
+        const s = app.state;
+        const currentFile = s._currentFullscreenFile;
+        if (!currentFile) return;
+        
+        // Find current directory
+        const dir = currentFile.split('/').slice(0, -1).join('/') || 'all';
+        const files = s.FOLDER_MAP[dir] || [];
+        
+        let html = '';
+        files.forEach((f, idx) => {
+            const info = s.MEDIA_DATA[f];
+            if (!info) return;
+            const isActive = f === currentFile ? 'active' : '';
+            // Only use thumbnails for images to avoid loading heavy videos unnecessarily
+            const thumbStyle = !info.isVideo ? `background-image: url('${CSS.escape(info.url)}');` : `background: #555; display:flex; align-items:center; justify-content:center; font-size:10px;`;
+            const thumbContent = info.isVideo ? '🎥' : '';
+            
+            html += `<div class="drawer-item ${isActive}" onclick="app.fullscreen.open('${CSS.escape(f)}')">
+                        <div class="drawer-item-thumb" style="${thumbStyle}">${thumbContent}</div>
+                        <div class="drawer-item-name" title="${info.name}">${info.name}</div>
+                     </div>`;
+        });
+        
+        content.innerHTML = html;
+        
+        // Scroll active into view
+        setTimeout(() => {
+            const activeEl = content.querySelector('.active');
+            if (activeEl) activeEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 100);
+    },
+
     // Toggle EXIF / AI Prompt metadata panel
     async toggleExif() {
         let panel = document.getElementById('exifPanel');
@@ -212,7 +262,11 @@ app.fullscreen = {
                             const key = split[0];
                             const val = split[split.length - 1]; // iTXt value is at the end
                             if (key !== 'workflow' && val.length > 2) {
-                                output += `<div style="color:#4CAF50; font-weight:bold; margin-top:10px;">${key}:</div>${val}\n`;
+                                output += `<div style="color:#4CAF50; font-weight:bold; margin-top:10px; display:flex; justify-content:space-between; align-items:center;">
+                                                <span>${key}:</span>
+                                                <button class="copy-exif-btn" data-val="${btoa(encodeURIComponent(val))}" style="background:#333; color:#fff; border:1px solid #555; border-radius:4px; cursor:pointer; font-size:11px; padding:2px 8px;">📋 Copy</button>
+                                           </div>
+                                           <div style="margin-top:4px;">${val}</div>\n`;
                             }
                         }
                         offset += 8 + len + 4;
@@ -232,11 +286,32 @@ app.fullscreen = {
                 }
                 const exifData = await exifr.parse(info.url) || {};
                 for (const [key, val] of Object.entries(exifData)) {
-                    if (typeof val !== 'object') output += `<b style="color:#2196F3;">${key}:</b> ${val}\n`;
+                    if (typeof val !== 'object') {
+                        output += `<div style="display:flex; justify-content:space-between; margin-top:4px;">
+                                       <b style="color:#2196F3;">${key}:</b>
+                                       <button class="copy-exif-btn" data-val="${btoa(encodeURIComponent(val))}" style="background:#333; color:#fff; border:1px solid #555; border-radius:4px; cursor:pointer; font-size:10px; padding:2px 6px;">Copy</button>
+                                   </div>
+                                   <div>${val}</div>\n`;
+                    }
                 }
             }
 
             panel.innerHTML = '<h4>EXIF / Prompt Data</h4>' + (output || '<i>No metadata found.</i>');
+            
+            // Attach copy listeners
+            panel.querySelectorAll('.copy-exif-btn').forEach(btn => {
+                btn.onclick = async () => {
+                    try {
+                        const text = decodeURIComponent(atob(btn.getAttribute('data-val')));
+                        await navigator.clipboard.writeText(text);
+                        btn.textContent = '✅ Copied!';
+                        setTimeout(() => btn.textContent = '📋 Copy', 2000);
+                        app.utils.showToast('Copied to clipboard', 'success');
+                    } catch(e) {
+                        app.utils.showToast('Failed to copy', 'error');
+                    }
+                };
+            });
         } catch (e) {
             panel.innerHTML = `<h4>EXIF / Prompt Data</h4><i>Error: ${e.message}</i>`;
         }

@@ -145,6 +145,14 @@
             <option value="">Jump to Folder...</option>
         </select>
         
+        <div id="fsFileDrawer" class="fs-file-drawer">
+            <div class="drawer-header">
+                📁 Folder Files
+                <button onclick="app.fullscreen.toggleDrawer()">×</button>
+            </div>
+            <div class="drawer-content" id="fsDrawerContent"></div>
+        </div>
+
         <button class="nav-btn prev-btn" id="prevBtn" onclick="app.fullscreen.navigate(-1)">‹</button>
         <button class="nav-btn next-btn" id="nextBtn" onclick="app.fullscreen.navigate(1)">›</button>
         
@@ -158,6 +166,7 @@
         <div class="playback-controls" id="playbackControls">
             <button id="markBtn" onclick="app.fullscreen.markForDeletion()" style="background:rgba(76,175,80,0.3); border-color:rgba(76,175,80,0.5);">☑ Mark & Next</button>
             <button id="exifBtn" onclick="app.fullscreen.toggleExif()" style="background:rgba(156,39,176,0.3); border-color:rgba(156,39,176,0.5);">ℹ️ EXIF / Prompts</button>
+            <button id="drawerBtn" onclick="app.fullscreen.toggleDrawer()">📁 File List</button>
             <button id="playPauseBtn" onclick="app.fullscreen.toggleSlideshow()">▶ Play</button>
             <label style="font-size:12px; color:#ccc;">
                 <input type="checkbox" id="slideshowShuffleCheck" onchange="app.utils.toggleSlideshowShuffle()"> Shuffle

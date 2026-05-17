@@ -71,8 +71,27 @@ app.main = {
             videoScrollTimeout = setTimeout(() => app.media.managePlayback(), 100);
         });
 
+        let fsHideTimeout;
         document.addEventListener('mousemove', (e) => {
             if (e.clientY < 100) document.getElementById('topControls').classList.remove('hidden');
+
+            // Fullscreen Auto-hide UI controls
+            const fsOverlay = document.getElementById('fullscreenOverlay');
+            if (fsOverlay && fsOverlay.classList.contains('visible')) {
+                const controls = document.getElementById('playbackControls');
+                const navBtns = document.querySelectorAll('.nav-btn');
+                
+                controls.classList.remove('auto-hide');
+                navBtns.forEach(b => b.classList.remove('auto-hide'));
+                
+                clearTimeout(fsHideTimeout);
+                fsHideTimeout = setTimeout(() => {
+                    if (!controls.matches(':hover') && !Array.from(navBtns).some(b => b.matches(':hover'))) {
+                        controls.classList.add('auto-hide');
+                        navBtns.forEach(b => b.classList.add('auto-hide'));
+                    }
+                }, 2500);
+            }
         });
 
         // UI Inputs
@@ -132,6 +151,7 @@ app.main = {
                 if (e.key === ' ') { e.preventDefault(); app.fullscreen.markForDeletion(); }
                 if (e.key === 'p' || e.key === 'P') { e.preventDefault(); app.fullscreen.toggleSlideshow(); }
                 if (e.key === 'i' || e.key === 'I') { e.preventDefault(); app.fullscreen.toggleExif(); }
+                if (e.key === 'l' || e.key === 'L') { e.preventDefault(); app.fullscreen.toggleDrawer(); }
                 if (e.key === 'F2') app.fullscreen.renameCurrentFile(); // #13
                 if (e.key === 'Delete') app.fullscreen.deleteCurrentFile(); // Delete in fullscreen
                 return;
