@@ -354,6 +354,21 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     char currentDir[MAX_PATH];
     char specifiedDir[MAX_PATH] = {0};
     
+    // Force kill any existing background instances silently and synchronously
+    SHELLEXECUTEINFO sei = {0};
+    sei.cbSize = sizeof(SHELLEXECUTEINFO);
+    sei.fMask = SEE_MASK_NOCLOSEPROCESS;
+    sei.hwnd = NULL;
+    sei.lpVerb = "open";
+    sei.lpFile = "taskkill";
+    sei.lpParameters = "/F /IM MattiasServe.exe /T";
+    sei.lpDirectory = NULL;
+    sei.nShow = SW_HIDE;
+    sei.hInstApp = NULL;
+    ShellExecuteEx(&sei);
+    WaitForSingleObject(sei.hProcess, INFINITE);
+    CloseHandle(sei.hProcess);
+    
     CoInitialize(NULL);
     
     // --- Enhanced argument parsing with help and directory support ---
@@ -437,7 +452,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
              "MediaBrowser_%d\\", GetCurrentProcessId());
     CreateDirectory(tempExePath, NULL);
     
-    snprintf(serverExePath, sizeof(serverExePath), "%sserver.exe", tempExePath);
+    snprintf(serverExePath, sizeof(serverExePath), "%sMattiasServe.exe", tempExePath);
     if (!ExtractServerBinary(serverExePath)) {
          char errMsg[512];
          snprintf(errMsg, sizeof(errMsg), 
