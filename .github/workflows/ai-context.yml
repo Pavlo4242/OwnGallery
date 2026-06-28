@@ -1,0 +1,34 @@
+name: Generate AI Context
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  pack-codebase:
+    name: Pack Codebase for LLMs
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Generate Repomix Context
+        run: |
+          # Use npx to run repomix without installing it globally
+          # This automatically respects your .gitignore
+          npx repomix --output codebase_context.xml
+
+      - name: Upload Context Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-codebase-context
+          path: codebase_context.xml
+          # Retain the artifact for 7 days to save storage space
+          retention-days: 7
