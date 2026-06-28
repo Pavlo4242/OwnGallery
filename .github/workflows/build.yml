@@ -49,7 +49,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: server-${{ matrix.platform }}
-          path: server/server.exe
+          path: server/MattiasServe.exe
           retention-days: 1
 
   build-launcher:
@@ -82,8 +82,8 @@ jobs:
       - name: Verify server.exe exists
         run: |
           dir server
-          if (!(Test-Path "server\server.exe")) {
-            throw "server.exe not found!"
+          if (!(Test-Path "server/MattiasServe.exe")) {
+            throw "MattiasServe.exe not found!"
           }
 
       - name: Build resource file
